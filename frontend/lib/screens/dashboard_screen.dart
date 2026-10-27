@@ -10,8 +10,8 @@ class DashboardScreen extends StatelessWidget {
 
   final List<_DashboardItem> _items = const [
     _DashboardItem(
-      title: 'Interactive Canvas',
-      subtitle: 'Freehand drawing, brush tools & interactive touch',
+      title: 'Tela Interativa',
+      subtitle: 'Desenho livre, ferramentas de pincel e toque interativo',
       icon: Icons.draw_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFFF6D00), Color(0xFFFF9E40)],
@@ -22,8 +22,8 @@ class DashboardScreen extends StatelessWidget {
       heroTag: 'canvas_hero',
     ),
     _DashboardItem(
-      title: 'Braille Pad Studio',
-      subtitle: '6/8 Dot Braille cell touch matrix & translation',
+      title: 'Estúdio BraillePad',
+      subtitle: 'Matriz de 6/8 pontos Braille e tradução em tempo real',
       icon: Icons.grid_on_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFE65100), Color(0xFFFF8F00)],
@@ -34,8 +34,8 @@ class DashboardScreen extends StatelessWidget {
       heroTag: 'braille_hero',
     ),
     _DashboardItem(
-      title: 'Saved Gallery',
-      subtitle: 'View, edit and export your created canvases',
+      title: 'Galeria Salva',
+      subtitle: 'Visualize, edite e exporte suas telas criadas',
       icon: Icons.collections_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFF57C00), Color(0xFFFFB300)],
@@ -46,8 +46,8 @@ class DashboardScreen extends StatelessWidget {
       heroTag: 'gallery_hero',
     ),
     _DashboardItem(
-      title: 'Settings',
-      subtitle: 'Brush sensitivity, grid options & preferences',
+      title: 'Configurações',
+      subtitle: 'Sensibilidade do pincel, opções de grade e preferências',
       icon: Icons.tune_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFEF6C00), Color(0xFFFF8A65)],
@@ -72,7 +72,7 @@ class DashboardScreen extends StatelessWidget {
             onPressed: () {
               showAboutDialog(
                 context: context,
-                applicationName: 'Braillepad Frontend',
+                applicationName: 'BraillePad Frontend',
                 applicationVersion: '1.0.0',
                 applicationIcon: const Icon(
                   Icons.gesture_rounded,
@@ -80,7 +80,7 @@ class DashboardScreen extends StatelessWidget {
                   size: 40,
                 ),
                 children: [
-                  const Text('An interactive Flutter canvas and braille pad studio.'),
+                  const Text('Estúdio interativo de telas e aprendizado de Braille.'),
                 ],
               );
             },
@@ -113,14 +113,14 @@ class DashboardScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Select Functionality',
+                        'Navegue pelas opções',
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: AppTheme.darkText,
                             ),
                       ),
                       Text(
-                        'Explore interactive features below',
+                        'Explore as opções em nosso app',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 14,

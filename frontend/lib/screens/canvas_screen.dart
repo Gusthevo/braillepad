@@ -79,12 +79,12 @@ class _CanvasScreenState extends State<CanvasScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear Canvas?'),
-        content: const Text('Are you sure you want to erase the entire drawing?'),
+        title: const Text('Limpar Tela?'),
+        content: const Text('Tem certeza de que deseja apagar todo o desenho?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -98,12 +98,12 @@ class _CanvasScreenState extends State<CanvasScreen> {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Canvas cleared'),
+                  content: Text('Tela limpa'),
                   duration: Duration(seconds: 2),
                 ),
               );
             },
-            child: const Text('Clear All'),
+            child: const Text('Limpar Tudo'),
           ),
         ],
       ),
@@ -117,7 +117,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
           children: [
             Icon(Icons.check_circle_rounded, color: Colors.white),
             SizedBox(width: 12),
-            Text('Drawing saved to Gallery!'),
+            Text('Desenho salvo na Galeria!'),
           ],
         ),
         backgroundColor: Colors.green.shade700,
@@ -132,7 +132,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Interactive Canvas'),
+        title: const Text('Tela Interativa'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -141,7 +141,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
           // Grid switch button
           PopupMenuButton<CanvasGridType>(
             icon: const Icon(Icons.grid_4x4_rounded),
-            tooltip: 'Grid Style',
+            tooltip: 'Estilo da Grade',
             onSelected: (type) => setState(() => _gridType = type),
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -150,7 +150,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
                   children: [
                     Icon(Icons.grain_rounded, color: AppTheme.primaryOrange),
                     SizedBox(width: 8),
-                    Text('Dot Grid'),
+                    Text('Grade de Pontos'),
                   ],
                 ),
               ),
@@ -160,7 +160,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
                   children: [
                     Icon(Icons.grid_on_rounded, color: AppTheme.primaryOrange),
                     SizedBox(width: 8),
-                    Text('Line Grid'),
+                    Text('Grade de Linhas'),
                   ],
                 ),
               ),
@@ -170,7 +170,7 @@ class _CanvasScreenState extends State<CanvasScreen> {
                   children: [
                     Icon(Icons.crop_square_rounded, color: AppTheme.primaryOrange),
                     SizedBox(width: 8),
-                    Text('Blank Canvas'),
+                    Text('Tela em Branco'),
                   ],
                 ),
               ),
@@ -179,22 +179,22 @@ class _CanvasScreenState extends State<CanvasScreen> {
           IconButton(
             icon: const Icon(Icons.undo_rounded),
             onPressed: _strokes.isNotEmpty ? _undo : null,
-            tooltip: 'Undo',
+            tooltip: 'Desfazer',
           ),
           IconButton(
             icon: const Icon(Icons.redo_rounded),
             onPressed: _redoStack.isNotEmpty ? _redo : null,
-            tooltip: 'Redo',
+            tooltip: 'Refazer',
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline_rounded),
             onPressed: _strokes.isNotEmpty ? _clearCanvas : null,
-            tooltip: 'Clear',
+            tooltip: 'Limpar',
           ),
           IconButton(
             icon: const Icon(Icons.save_alt_rounded),
             onPressed: _strokes.isNotEmpty ? _saveCanvas : null,
-            tooltip: 'Save',
+            tooltip: 'Salvar',
           ),
         ],
       ),

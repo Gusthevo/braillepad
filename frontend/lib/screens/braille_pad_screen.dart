@@ -13,7 +13,7 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
   final List<bool> _dots = [false, false, false, false, false, false];
   String _constructedText = '';
 
-  // Standard English Braille Map (Dot combinations -> Letter)
+  // Standard English/Portuguese Braille Map (Dot combinations -> Letter)
   static final Map<String, String> _brailleMap = {
     '100000': 'a',
     '110000': 'b',
@@ -80,7 +80,7 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Braille Pad Studio'),
+        title: const Text('Estúdio BraillePad'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -110,7 +110,7 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Constructed Text:',
+                      'Texto Construído:',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -119,7 +119,7 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _constructedText.isEmpty ? 'Tap dots to form letters...' : _constructedText,
+                      _constructedText.isEmpty ? 'Toque nos pontos para formar letras...' : _constructedText,
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -138,7 +138,7 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Detected Character: ',
+                    'Caractere Detectado: ',
                     style: TextStyle(fontSize: 18, color: AppTheme.darkText),
                   ),
                   AnimatedSwitcher(
@@ -236,12 +236,12 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
                   ElevatedButton.icon(
                     onPressed: _translatedChar != '?' ? _addCurrentCharacter : null,
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text('Add Letter'),
+                    label: const Text('Adicionar Letra'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => setState(() => _constructedText += ' '),
                     icon: const Icon(Icons.space_bar_rounded),
-                    label: const Text('Space'),
+                    label: const Text('Espaço'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -253,12 +253,12 @@ class _BraillePadScreenState extends State<BraillePadScreen> {
                       }
                     },
                     icon: const Icon(Icons.backspace_rounded),
-                    label: const Text('Backspace'),
+                    label: const Text('Apagar'),
                   ),
                   IconButton(
                     onPressed: _clearDots,
                     icon: const Icon(Icons.refresh_rounded),
-                    tooltip: 'Reset Dots',
+                    tooltip: 'Redefinir Pontos',
                   ),
                 ],
               ),

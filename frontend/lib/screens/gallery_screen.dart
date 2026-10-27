@@ -12,32 +12,32 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen> {
   final List<Map<String, dynamic>> _savedArtworks = [
     {
-      'title': 'Braille Dot Matrix Alpha',
-      'date': 'Oct 24, 2024',
+      'title': 'Matriz Alfa de Pontos Braille',
+      'date': '24 de Out, 2024',
       'imageUrl': 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&auto=format&fit=crop',
       'icon': Icons.grain_rounded,
       'color': const Color(0xFFFF6D00),
       'isFavorite': true,
     },
     {
-      'title': 'Orange Geometric Sunset',
-      'date': 'Oct 22, 2024',
+      'title': 'Padrão Geométrico Laranja',
+      'date': '22 de Out, 2024',
       'imageUrl': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop',
       'icon': Icons.architecture_rounded,
       'color': const Color(0xFFFF9E40),
       'isFavorite': false,
     },
     {
-      'title': 'Tactile Symbol Practice',
-      'date': 'Oct 18, 2024',
+      'title': 'Prática de Símbolos Táteis',
+      'date': '18 de Out, 2024',
       'imageUrl': 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?w=600&auto=format&fit=crop',
       'icon': Icons.touch_app_rounded,
       'color': const Color(0xFFE65100),
       'isFavorite': true,
     },
     {
-      'title': 'Freehand Abstract Canvas',
-      'date': 'Oct 15, 2024',
+      'title': 'Tela Abstrata Livre',
+      'date': '15 de Out, 2024',
       'imageUrl': 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop',
       'icon': Icons.palette_rounded,
       'color': const Color(0xFFFFAB00),
@@ -106,7 +106,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Created on ${item['date']}',
+              'Criado em ${item['date']}',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
             const SizedBox(height: 24),
@@ -124,7 +124,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     );
                   },
                   icon: const Icon(Icons.edit_rounded),
-                  label: const Text('Edit Canvas'),
+                  label: const Text('Editar Tela'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () {
@@ -137,7 +137,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     item['isFavorite'] ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                     color: Colors.red,
                   ),
-                  label: Text(item['isFavorite'] ? 'Unfavorite' : 'Favorite'),
+                  label: Text(item['isFavorite'] ? 'Desfavoritar' : 'Favoritar'),
                 ),
               ],
             ),
@@ -153,7 +153,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Saved Gallery'),
+        title: const Text('Galeria Salva'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -168,7 +168,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           );
         },
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text('New Canvas', style: TextStyle(color: Colors.white)),
+        label: const Text('Nova Tela', style: TextStyle(color: Colors.white)),
       ),
       body: SafeArea(
         child: Padding(
@@ -181,7 +181,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       Icon(Icons.collections_outlined, size: 80, color: Colors.grey.shade400),
                       const SizedBox(height: 16),
                       Text(
-                        'No saved artworks yet',
+                        'Nenhum desenho salvo ainda',
                         style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
                       ),
                     ],

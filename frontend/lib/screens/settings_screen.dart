@@ -20,7 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Configurações'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -31,7 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             // Canvas Preferences
-            _buildSectionHeader('Canvas Preferences'),
+            _buildSectionHeader('Preferências da Tela'),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -39,8 +39,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     SwitchListTile(
                       activeTrackColor: AppTheme.primaryOrange,
-                      title: const Text('Grid Snap'),
-                      subtitle: const Text('Snap drawing points to grid intersections'),
+                      title: const Text('Ajuste à Grade'),
+                      subtitle: const Text('Ajustar pontos de desenho às interseções da grade'),
                       value: _gridSnap,
                       onChanged: (val) => setState(() => _gridSnap = val),
                     ),
@@ -52,7 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Default Brush Thickness',
+                              'Espessura Padrão do Pincel',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                             ),
                             Text(
@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
 
             // Tactile & Feedback Settings
-            _buildSectionHeader('Tactile & Feedback'),
+            _buildSectionHeader('Tátil e Feedback'),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -89,16 +89,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     SwitchListTile(
                       activeTrackColor: AppTheme.primaryOrange,
-                      title: const Text('Haptic Vibration'),
-                      subtitle: const Text('Vibrate device on dot tap or drawing stroke'),
+                      title: const Text('Vibração Háptica'),
+                      subtitle: const Text('Vibrar o dispositivo ao tocar nos pontos ou desenhar'),
                       value: _hapticFeedback,
                       onChanged: (val) => setState(() => _hapticFeedback = val),
                     ),
                     const Divider(),
                     SwitchListTile(
                       activeTrackColor: AppTheme.primaryOrange,
-                      title: const Text('Audio Touch Feedback'),
-                      subtitle: const Text('Play subtle click sounds during touch interactions'),
+                      title: const Text('Feedback Sonoro de Toque'),
+                      subtitle: const Text('Tocar sons suaves durante as interações ao toque'),
                       value: _soundEffects,
                       onChanged: (val) => setState(() => _soundEffects = val),
                     ),
@@ -110,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Touch Sensitivity',
+                              'Sensibilidade do Toque',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                             ),
                             Text(
@@ -155,11 +155,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _touchSensitivity = 0.8;
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Settings restored to defaults')),
+                    const SnackBar(content: Text('Configurações restauradas para o padrão')),
                   );
                 },
                 icon: const Icon(Icons.restore_rounded),
-                label: const Text('Reset Defaults'),
+                label: const Text('Restaurar Padrões'),
               ),
             ),
           ],
