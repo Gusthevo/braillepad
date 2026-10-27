@@ -14,13 +14,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
     {
       'title': 'Braille Dot Matrix Alpha',
       'date': 'Oct 24, 2024',
+      'imageUrl': 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&auto=format&fit=crop',
       'icon': Icons.grain_rounded,
       'color': const Color(0xFFFF6D00),
       'isFavorite': true,
     },
     {
-      'title': 'Orange Geometric Pattern',
+      'title': 'Orange Geometric Sunset',
       'date': 'Oct 22, 2024',
+      'imageUrl': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop',
       'icon': Icons.architecture_rounded,
       'color': const Color(0xFFFF9E40),
       'isFavorite': false,
@@ -28,13 +30,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
     {
       'title': 'Tactile Symbol Practice',
       'date': 'Oct 18, 2024',
+      'imageUrl': 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?w=600&auto=format&fit=crop',
       'icon': Icons.touch_app_rounded,
       'color': const Color(0xFFE65100),
       'isFavorite': true,
     },
     {
-      'title': 'Freehand Sunset Canvas',
+      'title': 'Freehand Abstract Canvas',
       'date': 'Oct 15, 2024',
+      'imageUrl': 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop',
       'icon': Icons.palette_rounded,
       'color': const Color(0xFFFFAB00),
       'isFavorite': false,
@@ -64,19 +68,33 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: (item['color'] as Color).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                item['icon'] as IconData,
-                size: 60,
-                color: item['color'] as Color,
+            
+            // Image Preview Header
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                item['imageUrl'],
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 180,
+                  color: (item['color'] as Color).withValues(alpha: 0.2),
+                  child: Icon(item['icon'] as IconData, size: 60, color: item['color']),
+                ),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 180,
+                    color: Colors.grey.shade100,
+                    child: const Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryOrange),
+                    ),
+                  );
+                },
               ),
             ),
+            
             const SizedBox(height: 16),
             Text(
               item['title'],
@@ -173,7 +191,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   physics: const BouncingScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.9,
+                    childAspectRatio: 0.82,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                   ),
@@ -184,56 +202,69 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: () => _showArtworkDetail(item),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                (item['color'] as Color).withValues(alpha: 0.12),
-                                Colors.white,
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Align(
-                                alignment: Alignment.topRight,
-                                child: Icon(
-                                  item['isFavorite'] ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  color: Colors.red.shade400,
-                                  size: 20,
-                                ),
-                              ),
-                              Expanded(
-                                child: Center(
-                                  child: Icon(
-                                    item['icon'] as IconData,
-                                    size: 48,
-                                    color: item['color'] as Color,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Card Image Thumbnail
+                            Expanded(
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: Image.network(
+                                      item['imageUrl'],
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        color: (item['color'] as Color).withValues(alpha: 0.15),
+                                        child: Icon(item['icon'] as IconData, size: 48, color: item['color']),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.85),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        item['isFavorite'] ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                        color: Colors.red.shade400,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                item['title'],
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                            ),
+                            
+                            Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item['title'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item['date'],
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                item['date'],
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     );
