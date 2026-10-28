@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/sessao_service.dart';
 import 'health_pad_screen.dart';
+import 'turmas_screen.dart';
+import 'alunos_screen.dart';
+import 'modulos_screen.dart';
+import 'metricas_screen.dart';
+import 'execucao_sessao_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  Map<String, dynamic>? _sessaoAtiva;
 
   final List<_DashboardItem> _items = const [
     _DashboardItem(
@@ -15,7 +28,7 @@ class DashboardScreen extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: _PlaceholderScreen(title: 'Métricas e Relatórios'),
+      routeWidget: MetricasScreen(),
       heroTag: 'metricas_hero',
     ),
     _DashboardItem(
@@ -27,7 +40,7 @@ class DashboardScreen extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: _PlaceholderScreen(title: 'Turmas'),
+      routeWidget: TurmasScreen(),
       heroTag: 'turmas_hero',
     ),
     _DashboardItem(
@@ -39,7 +52,7 @@ class DashboardScreen extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: _PlaceholderScreen(title: 'Alunos'),
+      routeWidget: AlunosScreen(),
       heroTag: 'alunos_hero',
     ),
     _DashboardItem(
@@ -51,7 +64,7 @@ class DashboardScreen extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: _PlaceholderScreen(title: 'Atividades'),
+      routeWidget: ModulosScreen(),
       heroTag: 'atividades_hero',
     ),
     _DashboardItem(
@@ -69,6 +82,34 @@ class DashboardScreen extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkSessaoAtiva();
+  }
+
+  Future<void> _checkSessaoAtiva() async {
+    final sessao = await SessaoService.getSessaoAtiva();
+    if (mounted) {
+      setState(() {
+        _sessaoAtiva = sessao;
+      });
+    }
+  }
+
+  void _encerrarSessaoAtivaParcial() async {
+    final ok = await SessaoService.encerrarSessaoAtivaParcial();
+    if (mounted && ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sessão anterior salva como PARCIAL e encerrada.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      _checkSessaoAtiva();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
@@ -76,6 +117,11 @@ class DashboardScreen extends StatelessWidget {
         title: const Text('Dashboard'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _checkSessaoAtiva,
+            tooltip: 'Atualizar Dashboard',
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline_rounded),
             onPressed: () {
@@ -102,6 +148,84 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Banner de Sessão Ativa em Andamento (Sugestão 1)
+              if (_sessaoAtiva != null) ...[
+                Card(
+                  color: Colors.amber.shade50,
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: Colors.amber.shade700, width: 2),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900, size: 28),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Atendimento em Andamento!',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Aluno: ${_sessaoAtiva!['aluno_nome']} • ${_sessaoAtiva!['atividade_titulo']}',
+                          style: TextStyle(color: Colors.amber.shade900, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ExecucaoSessaoScreen(sessao: _sessaoAtiva!),
+                                    ),
+                                  ).then((_) => _checkSessaoAtiva());
+                                },
+                                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                                label: const Text('Continuar'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryOrange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _encerrarSessaoAtivaParcial,
+                                icon: const Icon(Icons.stop_rounded, size: 18, color: Colors.redAccent),
+                                label: const Text('Encerrar (Parcial)', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Colors.redAccent),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // Header greeting
               Row(
                 children: [
@@ -139,7 +263,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Dashboard Options Grid
               Expanded(
@@ -148,7 +272,10 @@ class DashboardScreen extends StatelessWidget {
                   itemCount: _items.length,
                   separatorBuilder: (context, index) => const SizedBox(height: 14),
                   itemBuilder: (context, index) {
-                    return _DashboardCard(item: _items[index]);
+                    return _DashboardCard(
+                      item: _items[index],
+                      onReturn: _checkSessaoAtiva,
+                    );
                   },
                 ),
               ),
@@ -180,8 +307,12 @@ class _DashboardItem {
 
 class _DashboardCard extends StatefulWidget {
   final _DashboardItem item;
+  final VoidCallback onReturn;
 
-  const _DashboardCard({required this.item});
+  const _DashboardCard({
+    required this.item,
+    required this.onReturn,
+  });
 
   @override
   State<_DashboardCard> createState() => _DashboardCardState();
@@ -193,7 +324,7 @@ class _DashboardCardState extends State<_DashboardCard> {
   void _navigateToScreen() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => widget.item.routeWidget),
-    );
+    ).then((_) => widget.onReturn());
   }
 
   @override
@@ -277,44 +408,6 @@ class _DashboardCardState extends State<_DashboardCard> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.warmBackground,
-      appBar: AppBar(
-        title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.construction_rounded, size: 64, color: AppTheme.primaryOrange),
-            const SizedBox(height: 16),
-            Text(
-              'Módulo: $title',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Próxima etapa do MVP DTAE',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ],
         ),
       ),
     );
