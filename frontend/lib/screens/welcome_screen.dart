@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'dashboard_screen.dart';
+import 'main_shell_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
-  void _navigateToDashboard(BuildContext context) {
+  void _navigateToMainShell(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const DashboardScreen(),
+        builder: (context) => const MainShellScreen(),
       ),
     );
   }
@@ -139,7 +139,7 @@ class WelcomeScreen extends StatelessWidget {
                           ],
                         ),
                         child: ElevatedButton(
-                          onPressed: () => _navigateToDashboard(context),
+                          onPressed: () => _navigateToMainShell(context),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: AppTheme.primaryOrange,

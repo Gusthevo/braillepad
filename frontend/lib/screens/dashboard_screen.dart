@@ -1,61 +1,70 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import 'canvas_screen.dart';
-import 'braille_pad_screen.dart';
-import 'gallery_screen.dart';
-import 'settings_screen.dart';
+import 'health_pad_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   final List<_DashboardItem> _items = const [
     _DashboardItem(
-      title: 'Tela Interativa',
-      subtitle: 'Desenho livre, ferramentas de pincel e toque interativo',
-      icon: Icons.draw_rounded,
+      title: 'Métricas e Relatórios',
+      subtitle: 'Indicadores de aprendizagem, gráficos e alertas pedagógicos',
+      icon: Icons.analytics_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFFF6D00), Color(0xFFFF9E40)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: CanvasScreen(),
-      heroTag: 'canvas_hero',
+      routeWidget: _PlaceholderScreen(title: 'Métricas e Relatórios'),
+      heroTag: 'metricas_hero',
     ),
     _DashboardItem(
-      title: 'Estúdio BraillePad',
-      subtitle: 'Matriz de 6/8 pontos Braille e tradução em tempo real',
-      icon: Icons.grid_on_rounded,
+      title: 'Turmas',
+      subtitle: 'Gerencie suas turmas, ano letivo e alunos vinculados',
+      icon: Icons.groups_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFE65100), Color(0xFFFF8F00)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: BraillePadScreen(),
-      heroTag: 'braille_hero',
+      routeWidget: _PlaceholderScreen(title: 'Turmas'),
+      heroTag: 'turmas_hero',
     ),
     _DashboardItem(
-      title: 'Galeria Salva',
-      subtitle: 'Visualize, edite e exporte suas telas criadas',
-      icon: Icons.collections_rounded,
+      title: 'Alunos',
+      subtitle: 'Lista geral de alunos, transferências e histórico individual',
+      icon: Icons.person_search_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFF57C00), Color(0xFFFFB300)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: GalleryScreen(),
-      heroTag: 'gallery_hero',
+      routeWidget: _PlaceholderScreen(title: 'Alunos'),
+      heroTag: 'alunos_hero',
     ),
     _DashboardItem(
-      title: 'Configurações',
-      subtitle: 'Sensibilidade do pincel, opções de grade e preferências',
-      icon: Icons.tune_rounded,
+      title: 'Atividades',
+      subtitle: 'Catálogo de Módulos DTAE (Vogais, Sílabas e Palavras)',
+      icon: Icons.extension_rounded,
       gradient: LinearGradient(
         colors: [Color(0xFFEF6C00), Color(0xFFFF8A65)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      routeWidget: SettingsScreen(),
-      heroTag: 'settings_hero',
+      routeWidget: _PlaceholderScreen(title: 'Atividades'),
+      heroTag: 'atividades_hero',
+    ),
+    _DashboardItem(
+      title: 'Health PAD',
+      subtitle: 'Status de conexão com o dispositivo embarcado',
+      icon: Icons.sensors_rounded,
+      gradient: LinearGradient(
+        colors: [Color(0xFFD84315), Color(0xFFFF7043)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      routeWidget: HealthPadScreen(),
+      heroTag: 'health_pad_hero',
     ),
   ];
 
@@ -72,15 +81,15 @@ class DashboardScreen extends StatelessWidget {
             onPressed: () {
               showAboutDialog(
                 context: context,
-                applicationName: 'BraillePad Frontend',
+                applicationName: 'BraillePad MVP',
                 applicationVersion: '1.0.0',
                 applicationIcon: const Icon(
-                  Icons.gesture_rounded,
+                  Icons.school_rounded,
                   color: AppTheme.primaryOrange,
                   size: 40,
                 ),
                 children: [
-                  const Text('Estúdio interativo de telas e aprendizado de Braille.'),
+                  const Text('Plataforma DTAE para apoio à alfabetização em Braille.'),
                 ],
               );
             },
@@ -120,7 +129,7 @@ class DashboardScreen extends StatelessWidget {
                             ),
                       ),
                       Text(
-                        'Explore as opções em nosso app',
+                        'Explore as funcionalidades do DTAE',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 14,
@@ -132,24 +141,14 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // 4 Dashboard Options Grid
+              // Dashboard Options Grid
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth > 600;
-                    return GridView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isWide ? 2 : 1,
-                        childAspectRatio: isWide ? 1.8 : 2.1,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: _items.length,
-                      itemBuilder: (context, index) {
-                        return _DashboardCard(item: _items[index]);
-                      },
-                    );
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _items.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    return _DashboardCard(item: _items[index]);
                   },
                 ),
               ),
@@ -193,28 +192,7 @@ class _DashboardCardState extends State<_DashboardCard> {
 
   void _navigateToScreen() {
     Navigator.of(context).push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 500),
-        reverseTransitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            widget.item.routeWidget,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.05, 0.1),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-      ),
+      MaterialPageRoute(builder: (context) => widget.item.routeWidget),
     );
   }
 
@@ -225,7 +203,7 @@ class _DashboardCardState extends State<_DashboardCard> {
       duration: const Duration(milliseconds: 150),
       child: Card(
         clipBehavior: Clip.antiAlias,
-        elevation: _isHovered ? 2 : 6,
+        elevation: _isHovered ? 2 : 5,
         child: InkWell(
           onTapDown: (_) => setState(() => _isHovered = true),
           onTapCancel: () => setState(() => _isHovered = false),
@@ -240,12 +218,11 @@ class _DashboardCardState extends State<_DashboardCard> {
             padding: const EdgeInsets.all(20.0),
             child: Row(
               children: [
-                // Icon with Hero tag
                 Hero(
                   tag: widget.item.heroTag,
                   child: Container(
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
@@ -257,40 +234,34 @@ class _DashboardCardState extends State<_DashboardCard> {
                     child: Icon(
                       widget.item.icon,
                       color: Colors.white,
-                      size: 32,
+                      size: 28,
                     ),
                   ),
                 ),
-                const SizedBox(width: 20),
-
-                // Title & Subtitle
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.item.title,
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         widget.item.subtitle,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: Colors.white.withValues(alpha: 0.9),
-                          height: 1.2,
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                // Arrow indicator
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -300,12 +271,50 @@ class _DashboardCardState extends State<_DashboardCard> {
                   child: const Icon(
                     Icons.arrow_forward_ios_rounded,
                     color: Colors.white,
-                    size: 16,
+                    size: 14,
                   ),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaceholderScreen extends StatelessWidget {
+  final String title;
+
+  const _PlaceholderScreen({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.warmBackground,
+      appBar: AppBar(
+        title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.construction_rounded, size: 64, color: AppTheme.primaryOrange),
+            const SizedBox(height: 16),
+            Text(
+              'Módulo: $title',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Próxima etapa do MVP DTAE',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ],
         ),
       ),
     );

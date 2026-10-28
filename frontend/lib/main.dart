@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
+import 'services/auth_service.dart';
+import 'screens/login_screen.dart';
 import 'screens/welcome_screen.dart';
 
 void main() {
@@ -12,10 +14,10 @@ class BraillepadApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Braillepad Frontend',
+      title: 'BraillePad MVP',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.themeData,
-      home: const WelcomeScreen(),
+      home: AuthService.isLoggedIn ? const WelcomeScreen() : const LoginScreen(),
     );
   }
 }
