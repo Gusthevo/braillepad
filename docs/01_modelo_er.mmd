@@ -1,0 +1,189 @@
+erDiagram
+    %% DTAE — Modelo Entidade-Relacionamento conceitual (MVP)
+    %% Cada atividade tem fases, que apresentam alvos reutilizaveis.
+    %% Um alvo pode exigir uma ou mais fichas em ordem.
+
+    PROFESSOR ||--o{ SESSAO_AUTENTICACAO : mantem_login
+    PROFESSOR ||--o{ TURMA : gerencia
+    PROFESSOR ||--o| PREFERENCIA_PROFESSOR : personaliza
+    TURMA ||--o{ ALUNO : matricula_atual
+    ALUNO ||--o{ TRANSFERENCIA_ALUNO : tem_historico
+    TURMA ||--o{ TRANSFERENCIA_ALUNO : origem_ou_destino
+
+    MODULO ||--o{ ATIVIDADE : contem
+    ATIVIDADE ||--o{ FASE_ATIVIDADE : organiza
+    FASE_ATIVIDADE ||--o{ FASE_ALVO : lista
+    ALVO ||--o{ FASE_ALVO : reutilizado_em
+    ALVO ||--|{ ALVO_FICHA : possui_sequencia
+    FICHA ||--o{ ALVO_FICHA : ficha_esperada
+
+    PROFESSOR ||--o{ SESSAO_ATIVIDADE : conduz
+    TURMA ||--o{ SESSAO_ATIVIDADE : registra_turma_historica
+    ALUNO ||--o{ SESSAO_ATIVIDADE : realiza
+    ATIVIDADE ||--o{ SESSAO_ATIVIDADE : executada_em
+    SESSAO_ATIVIDADE ||--o{ EXECUCAO_ALVO : contem
+    FASE_ALVO ||--o{ EXECUCAO_ALVO : aplicado_com_ordem_real
+    EXECUCAO_ALVO ||--o{ TENTATIVA : recebe
+    TENTATIVA ||--o{ LEITURA_FICHA : registra
+    FICHA ||--o{ LEITURA_FICHA : apresentada_ou_esperada
+
+    PROFESSOR ||--o{ COMENTARIO_PROFESSOR : escreve
+    SESSAO_ATIVIDADE ||--o{ COMENTARIO_PROFESSOR : recebe
+    SESSAO_ATIVIDADE ||--o| AVALIACAO_SESSAO : pode_ser_avaliada
+    REGRA_PONTUACAO ||--o{ AVALIACAO_SESSAO : calculada_com
+    REGRA_PONTUACAO ||--o{ PARAMETRO_PONTUACAO : parametriza
+
+    PROFESSOR {
+        uuid id
+        string nome
+        string sobrenome
+        string email
+        string senha_hash
+        string foto_url
+        boolean ativo
+    }
+    SESSAO_AUTENTICACAO {
+        uuid id
+        uuid professor_id
+        string refresh_token_hash
+        timestamp expira_em
+        timestamp revogada_em
+    }
+    PREFERENCIA_PROFESSOR {
+        uuid professor_id
+        string tema
+        boolean alto_contraste
+        decimal escala_fonte
+        string modo_padrao
+    }
+    TURMA {
+        uuid id
+        uuid professor_id
+        string nome
+        string descricao
+        integer ano_letivo
+        timestamp arquivada_em
+    }
+    ALUNO {
+        uuid id
+        uuid turma_atual_id
+        string nome
+        string sobrenome
+        string nivel_braille
+        timestamp arquivado_em
+    }
+    TRANSFERENCIA_ALUNO {
+        uuid id
+        uuid aluno_id
+        uuid turma_origem_id
+        uuid turma_destino_id
+        timestamp transferido_em
+    }
+    MODULO {
+        smallint numero
+        string nome
+        string categoria
+    }
+    ATIVIDADE {
+        uuid id
+        smallint numero
+        string titulo
+        boolean publicada
+        boolean obrigatoria
+    }
+    FASE_ATIVIDADE {
+        uuid id
+        integer ordem
+        string tipo_fase
+        boolean pontuavel
+        string sequenciamento
+    }
+    ALVO {
+        uuid id
+        string rotulo
+        string tipo_alvo
+    }
+    FICHA {
+        uuid id
+        string simbolo
+        string codigo_rfid_opcional
+    }
+    ALVO_FICHA {
+        uuid alvo_id
+        integer posicao
+        uuid ficha_id
+    }
+    FASE_ALVO {
+        uuid id
+        uuid fase_id
+        uuid alvo_id
+        integer ordem_padrao
+        boolean obrigatorio
+    }
+    SESSAO_ATIVIDADE {
+        uuid id
+        uuid professor_id
+        uuid turma_id
+        uuid aluno_id
+        uuid atividade_id
+        string status
+        string modo_registro
+        timestamp iniciada_em
+        timestamp encerrada_em
+    }
+    EXECUCAO_ALVO {
+        uuid id
+        uuid sessao_id
+        uuid fase_alvo_id
+        integer ordem_real
+        string status
+    }
+    TENTATIVA {
+        uuid id
+        uuid execucao_alvo_id
+        integer numero
+        string resultado
+        timestamp iniciada_em
+    }
+    LEITURA_FICHA {
+        uuid id
+        uuid tentativa_id
+        integer posicao
+        uuid ficha_apresentada_id
+        uuid ficha_esperada_id
+        boolean correta
+        timestamp registrada_em
+    }
+    COMENTARIO_PROFESSOR {
+        uuid id
+        uuid sessao_id
+        uuid professor_id
+        string texto
+        timestamp criado_em
+    }
+    AVALIACAO_SESSAO {
+        uuid sessao_id
+        uuid regra_id
+        string nivel_ajuda
+        string compreensao
+        decimal nota
+    }
+    REGRA_PONTUACAO {
+        uuid id
+        string categoria
+        integer versao
+        boolean ativa
+    }
+    PARAMETRO_PONTUACAO {
+        uuid regra_id
+        string criterio
+        string chave
+        decimal pontos
+    }
+    CONFIG_METRICAS {
+        integer id
+        integer notas_janela
+        integer minimo_notas
+        decimal limiar_amarelo
+        decimal limiar_verde
+    }
