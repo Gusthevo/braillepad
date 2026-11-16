@@ -96,8 +96,16 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
           ),
         );
       } else {
-        // Sugestão 2: Modal quando já existe sessão ativa
-        _exibirDialogoSessaoConflito();
+        if (encerrarAnterior) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível iniciar a nova sessão. Tente novamente.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        } else {
+          _exibirDialogoSessaoConflito();
+        }
       }
     }
   }
@@ -107,7 +115,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
 
     if (!mounted) return;
 
-    showDialog(
+    final acaoEscolhida = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Row(
@@ -139,30 +147,32 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              if (sessaoAtiva != null) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ExecucaoSessaoScreen(sessao: sessaoAtiva),
-                  ),
-                );
-              }
-            },
+            onPressed: () => Navigator.pop(dialogContext, 'CONTINUAR'),
             child: const Text('Continuar Sessão Ativa'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryOrange),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _iniciarSessaoAtendimento(encerrarAnterior: true);
-            },
-            child: const Text('Encerrar Anterior (Parcial) e Iniciar Nova'),
+            onPressed: () => Navigator.pop(dialogContext, 'ENCERRAR_E_NOVA'),
+            child: const Text('Encerrar Anterior e Iniciar Nova'),
           ),
         ],
       ),
     );
+
+    if (!mounted || acaoEscolhida == null) return;
+
+    if (acaoEscolhida == 'CONTINUAR') {
+      if (sessaoAtiva != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ExecucaoSessaoScreen(sessao: sessaoAtiva),
+          ),
+        );
+      }
+    } else if (acaoEscolhida == 'ENCERRAR_E_NOVA') {
+      _iniciarSessaoAtendimento(encerrarAnterior: true);
+    }
   }
 
   @override

@@ -109,12 +109,18 @@ class SessaoService {
     }
   }
 
-  // 5. Finalizar Sessão e Calcular Nota DTAE (RF-024)
+  // 5. Finalizar Sessão e Salvar Avaliação com Duração e Acertos Reais (YouthTech Spec)
   static Future<Map<String, dynamic>?> finalizarSessao(
     String sessaoId, {
-    String nivelAjuda = 'NENHUMA',
-    String? compreensao = 'TOTAL',
+    int duracaoSegundos = 0,
+    int totalAcertos = 0,
+    int totalTentativas = 0,
+    String? nivelAuxilioFase1 = 'INDEPENDENTE',
+    String? nivelAuxilioFase2 = 'INDEPENDENTE',
+    String? compreensaoInstrucoes = 'TOTAL',
+    String? autonomiaExploracao = 'SIM',
     String? comentario,
+    int avaliacaoEstrelas = 5,
   }) async {
     try {
       final response = await http
@@ -122,9 +128,15 @@ class SessaoService {
             Uri.parse('${ApiService.baseUrl}/api/sessoes/$sessaoId/finalizar'),
             headers: _headers,
             body: jsonEncode({
-              'nivel_ajuda': nivelAjuda,
-              'compreensao': compreensao,
+              'duracao_segundos': duracaoSegundos,
+              'total_acertos': totalAcertos,
+              'total_tentativas': totalTentativas,
+              'nivel_auxilio_fase1': nivelAuxilioFase1,
+              'nivel_auxilio_fase2': nivelAuxilioFase2,
+              'compreensao_instrucoes': compreensaoInstrucoes,
+              'autonomia_exploracao': autonomiaExploracao,
               'comentario': comentario,
+              'avaliacao_estrelas': avaliacaoEstrelas,
             }),
           )
           .timeout(const Duration(seconds: 6));

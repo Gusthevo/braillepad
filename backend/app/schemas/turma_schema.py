@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 class TurmaCreateRequest(BaseModel):
-    nome: str = Field(..., min_length=2, example="Turma A - Manhã")
+    nome: str = Field(..., min_length=1, example="Turma A - Manhã")
     descricao: str = Field(default="", example="Atendimento Educacional Especializado no turno matutino")
     ano_letivo: int | None = Field(default=2026, ge=2020, le=2200, example=2026)
     ano_escolar: str | None = Field(default="1º Ano", example="1º Ano do Ensino Fundamental")
