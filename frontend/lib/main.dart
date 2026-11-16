@@ -4,7 +4,9 @@ import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/welcome_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.init();
   runApp(const BraillepadApp());
 }
 

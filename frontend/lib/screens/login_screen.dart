@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28.0),
+            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 16.0),
             child: Form(
               key: _formKey,
               child: Column(
@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 32),
 
                   // E-mail Input
                   TextFormField(
@@ -243,6 +243,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
+          child: Text(
+            'YouthTech (2026)',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              fontSize: 9,
+              color: Colors.grey.shade600,
+              letterSpacing: 0.5,
             ),
           ),
         ),

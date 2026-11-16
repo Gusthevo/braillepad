@@ -57,6 +57,14 @@ class _AlunosScreenState extends State<AlunosScreen> {
     }).toList();
   }
 
+  String _formatarNivelBraille(String? nivel) {
+    if (nivel == null) return 'Iniciante';
+    final upper = nivel.toUpperCase();
+    if (upper == 'INTERMEDIARIO' || upper == 'EM_APRENDIZAGEM') return 'Intermediário';
+    if (upper == 'AVANCADO' || upper == 'FAMILIARIZADO') return 'Avançado';
+    return 'Iniciante';
+  }
+
   void _showNovoAlunoModal() async {
     if (_turmas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -203,7 +211,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Nível de Braille
+                        // Nível de Braille (Iniciante, Intermediário, Avançado)
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: nivelBraille,
@@ -218,8 +226,8 @@ class _AlunosScreenState extends State<AlunosScreen> {
                             ),
                             items: const [
                               DropdownMenuItem(value: 'INICIANTE', child: Text('Iniciante')),
-                              DropdownMenuItem(value: 'EM_APRENDIZAGEM', child: Text('Aprendizagem')),
-                              DropdownMenuItem(value: 'FAMILIARIZADO', child: Text('Familiarizado')),
+                              DropdownMenuItem(value: 'INTERMEDIARIO', child: Text('Intermediário')),
+                              DropdownMenuItem(value: 'AVANCADO', child: Text('Avançado')),
                             ],
                             onChanged: (val) {
                               if (val != null) setModalState(() => nivelBraille = val);
@@ -452,7 +460,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                 ),
                                 subtitle: Text(
-                                  'Turma: ${aluno['turma_nome']} • Braille: ${aluno['nivel_braille'] ?? 'INICIANTE'}',
+                                  'Turma: ${aluno['turma_nome']} • Braille: ${_formatarNivelBraille(aluno['nivel_braille'])}',
                                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                 ),
                                 trailing: isArquivado

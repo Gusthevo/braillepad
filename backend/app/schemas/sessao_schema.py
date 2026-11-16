@@ -16,17 +16,21 @@ class LeituraFichaRequest(BaseModel):
 
 
 class SessaoFinalizarRequest(BaseModel):
-    nivel_ajuda: str = Field(default="NENHUMA", example="NENHUMA", description="NENHUMA, VERBAL, FISICA")
-    compreensao: str | None = Field(default="TOTAL", example="TOTAL", description="TOTAL, PARCIAL, NENHUMA")
-    comentario: str | None = Field(default=None, example="O aluno respondeu com autonomia.")
+    duracao_segundos: int | None = Field(default=0, example=135, description="Duração total da sessão em segundos")
+    total_acertos: int | None = Field(default=0, example=5, description="Total de acertos na sessão")
+    total_tentativas: int | None = Field(default=0, example=10, description="Total de tentativas na sessão")
+    nivel_auxilio_fase1: str | None = Field(default="INDEPENDENTE", example="INDEPENDENTE")
+    nivel_auxilio_fase2: str | None = Field(default="INDEPENDENTE", example="INDEPENDENTE")
+    compreensao_instrucoes: str | None = Field(default="TOTAL", example="TOTAL")
+    autonomia_exploracao: str | None = Field(default="SIM", example="SIM")
+    comentario: str | None = Field(default=None, example="Criança demonstrou excelente percepção das vogais.")
+    avaliacao_estrelas: int | None = Field(default=5, ge=1, le=5, example=5)
 
 
-class LeituraResponse(BaseModel):
-    id: str
-    posicao: int
-    ficha_codigo: str
-    correta: bool
-    registrada_em: str
+class AlertaAtividadeResponse(BaseModel):
+    tipo: str
+    titulo: str
+    mensagem: str
 
 
 class SessaoResponse(BaseModel):
@@ -41,8 +45,15 @@ class SessaoResponse(BaseModel):
     status: str  # EM_ANDAMENTO, CONCLUIDA, PARCIAL
     iniciada_em: str
     finalizada_em: str | None = None
+    duracao_segundos: int | None = 0
     nota: float | None = None
-    total_tentativas: int = 0
-    nivel_ajuda: str | None = None
-    compreensao: str | None = None
+    percentual_acertos: float | None = 100.0
+    avaliacao_estrelas: int | None = 5
+    nivel_auxilio_fase1: str | None = None
+    nivel_auxilio_fase2: str | None = None
+    compreensao_instrucoes: str | None = None
+    autonomia_exploracao: str | None = None
     comentarios: list[str] = []
+    alertas_gerados: list[AlertaAtividadeResponse] = []
+    modulo_categoria: str = Field(default="VOGAIS", example="VOGAIS", description="VOGAIS, SILABAS, PALAVRAS")
+    alvos_esperados: list[str] = Field(default_factory=list, example=["A", "E", "I", "O", "U"])

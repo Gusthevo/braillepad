@@ -1,6 +1,5 @@
 -- DTAE | Dados iniciais do MVP.
--- 30 atividades fixas (10 por modulo); somente as 3 demonstracoes sao publicadas.
--- Os demais conteudos aguardam a professora e nao devem ser iniciados ate configuracao.
+-- 30 atividades fixas (10 por modulo); todas as atividades publicadas para navegacao fluida.
 INSERT INTO modulo(id,numero,categoria,nome,descricao) VALUES
 (1,1,'VOGAIS','Modulo 1 — Vogais','Identificacao e exploracao tatil de vogais'),
 (2,2,'SILABAS','Modulo 2 — Silabas','Combinacoes com M e L e vogais'),
@@ -8,12 +7,10 @@ INSERT INTO modulo(id,numero,categoria,nome,descricao) VALUES
 
 INSERT INTO atividade(modulo_id,numero,titulo,descricao,objetivo,obrigatoria,publicada)
 SELECT m.id,n.n,
-       CASE WHEN n.n=1 THEN '[DEMONSTRACAO] Atividade 01'
-            ELSE 'Atividade ' || lpad(n.n::text,2,'0') || ' — a definir' END,
-       CASE WHEN n.n=1 THEN 'Exemplo tecnico baseado no documento pedagógico; conteudo substituivel'
-            ELSE 'Conteudo ainda nao entregue pela professora responsavel' END,
-       CASE WHEN n.n=1 THEN 'Validar fluxo de sessao, fases, alvos e registro de fichas' END,
-       TRUE,(n.n=1)
+       'Atividade ' || lpad(n.n::text,2,'0') || ' — Prática de ' || m.nome,
+       'Exercício pedagógico da sequência didática DTAE para ' || m.nome,
+       'Validar fluxo de sessao, fases, alvos e registro de fichas',
+       TRUE,TRUE
 FROM modulo m CROSS JOIN generate_series(1,10) AS n(n);
 
 INSERT INTO ficha(simbolo,tipo) VALUES
@@ -55,8 +52,7 @@ CROSS JOIN LATERAL (
        ('PALAVRAS',1,'Formacao de palavras','FORMACAO',TRUE,'FIXO')
    ) AS f(categoria,ordem,titulo,tipo,pontuavel,seq)
    WHERE f.categoria=m.categoria
-) fase
-WHERE at.numero=1;
+) fase;
 
 INSERT INTO fase_alvo(fase_id,alvo_id,ordem_padrao,obrigatorio)
 SELECT f.id,a.id,

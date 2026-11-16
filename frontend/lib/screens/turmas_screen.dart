@@ -13,7 +13,7 @@ class TurmasScreen extends StatefulWidget {
 class _TurmasScreenState extends State<TurmasScreen> {
   List<Map<String, dynamic>> _turmas = [];
   bool _isLoading = true;
-  bool _isGridView = false; // Toggle entre Lista e Grade (RF-007)
+  bool _isGridView = false;
   bool _incluirArquivadas = false;
 
   @override
@@ -33,11 +33,11 @@ class _TurmasScreenState extends State<TurmasScreen> {
     }
   }
 
-  void _showNovaTurmaModal() {
+  void _showCreateTurmaModal() {
     final formKey = GlobalKey<FormState>();
     final nomeController = TextEditingController();
     final descricaoController = TextEditingController();
-    final anoEscolarController = TextEditingController(text: '1º Ano');
+    String anoEscolar = '1º Ano';
     int anoLetivo = DateTime.now().year;
     String turno = 'MANHA';
 
@@ -129,10 +129,10 @@ class _TurmasScreenState extends State<TurmasScreen> {
 
                     Row(
                       children: [
-                        // Ano Escolar
+                        // Ano Escolar Dropdown (1º Ano ao 3º Ano)
                         Expanded(
-                          child: TextFormField(
-                            controller: anoEscolarController,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: anoEscolar,
                             decoration: InputDecoration(
                               labelText: 'Ano Escolar',
                               prefixIcon: const Icon(Icons.school_outlined),
@@ -143,6 +143,14 @@ class _TurmasScreenState extends State<TurmasScreen> {
                                 borderSide: BorderSide.none,
                               ),
                             ),
+                            items: const [
+                              DropdownMenuItem(value: '1º Ano', child: Text('1º Ano')),
+                              DropdownMenuItem(value: '2º Ano', child: Text('2º Ano')),
+                              DropdownMenuItem(value: '3º Ano', child: Text('3º Ano')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => anoEscolar = val);
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -176,32 +184,54 @@ class _TurmasScreenState extends State<TurmasScreen> {
 
                     const SizedBox(height: 24),
 
+                    // Actions
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryOrange,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
-                          Navigator.pop(modalContext);
 
-                          final novaTurma = await TurmaService.createTurma(
+                          final res = await TurmaService.createTurma(
                             nome: nomeController.text.trim(),
                             descricao: descricaoController.text.trim(),
                             anoLetivo: anoLetivo,
-                            anoEscolar: anoEscolarController.text.trim(),
+                            anoEscolar: anoEscolar,
                             turno: turno,
                           );
 
-                          if (mounted && novaTurma != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Turma criada com sucesso!'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                            _loadTurmas();
+                          if (modalContext.mounted) {
+                            Navigator.pop(modalContext);
+                          }
+                          if (mounted) {
+                            if (res != null) {
+                              _loadTurmas();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Turma criada com sucesso!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Erro ao criar turma.'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
                           }
                         },
-                        child: const Text('Salvar Turma'),
+                        child: const Text(
+                          'Salvar Turma',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],
@@ -210,6 +240,36 @@ class _TurmasScreenState extends State<TurmasScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _arquivarTurma(String turmaId, String nome) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Arquivar Turma?'),
+        content: Text('A turma "$nome" será arquivada. O histórico dos alunos continuará preservado.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade800),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final ok = await TurmaService.arquivarTurma(turmaId);
+              if (mounted && ok) {
+                _loadTurmas();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Turma arquivada com sucesso.')),
+                );
+              }
+            },
+            child: const Text('Arquivar'),
+          ),
+        ],
       ),
     );
   }
@@ -219,14 +279,19 @@ class _TurmasScreenState extends State<TurmasScreen> {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Minhas Turmas'),
+        title: const Text('Gestão de Turmas'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
-          // Toggle Lista / Grade (RF-007)
+          // Toggle View Mode (List vs Grid)
           IconButton(
             icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded),
             onPressed: () => setState(() => _isGridView = !_isGridView),
             tooltip: _isGridView ? 'Ver em Lista' : 'Ver em Grade',
           ),
+          // Filter Archived
           PopupMenuButton<bool>(
             icon: const Icon(Icons.filter_list_rounded),
             onSelected: (val) {
@@ -234,160 +299,179 @@ class _TurmasScreenState extends State<TurmasScreen> {
               _loadTurmas();
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: false,
-                child: Row(
-                  children: [
-                    Icon(Icons.check_rounded,
-                        color: !_incluirArquivadas ? AppTheme.primaryOrange : Colors.transparent),
-                    const SizedBox(width: 8),
-                    const Text('Apenas Turmas Ativas'),
-                  ],
-                ),
+                child: Text('Apenas Turmas Ativas'),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: true,
-                child: Row(
-                  children: [
-                    Icon(Icons.check_rounded,
-                        color: _incluirArquivadas ? AppTheme.primaryOrange : Colors.transparent),
-                    const SizedBox(width: 8),
-                    const Text('Exibir Arquivadas'),
-                  ],
-                ),
+                child: Text('Incluir Arquivadas'),
               ),
             ],
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.primaryOrange,
-        onPressed: _showNovaTurmaModal,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text('Nova Turma', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
-              : _turmas.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.groups_outlined, size: 70, color: Colors.grey.shade400),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Nenhuma turma cadastrada',
-                            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Clique em "+ Nova Turma" para começar',
-                            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _isGridView
-                      ? GridView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.95,
-                            crossAxisSpacing: 14,
-                            mainAxisSpacing: 14,
-                          ),
-                          itemCount: _turmas.length,
-                          itemBuilder: (context, index) => _buildTurmaCard(_turmas[index]),
-                        )
-                      : ListView.separated(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: _turmas.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) => _buildTurmaCard(_turmas[index]),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+            : _turmas.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.groups_outlined, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nenhuma turma encontrada',
+                          style: TextStyle(fontSize: 18, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
                         ),
-        ),
+                        const SizedBox(height: 8),
+                        const Text('Clique no botão abaixo para criar sua primeira turma.'),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadTurmas,
+                    color: AppTheme.primaryOrange,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _isGridView ? _buildGridView() : _buildListView(),
+                    ),
+                  ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateTurmaModal,
+        backgroundColor: AppTheme.primaryOrange,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Nova Turma'),
       ),
     );
   }
 
-  Widget _buildTurmaCard(Map<String, dynamic> turma) {
-    final isArquivada = turma['arquivada_em'] != null;
+  Widget _buildListView() {
+    return ListView.separated(
+      itemCount: _turmas.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final t = _turmas[index];
+        final isArquivada = t['arquivada_em'] != null;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TurmaDetailScreen(turmaId: turma['id']),
+        return Card(
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: isArquivada
+                  ? Colors.grey.shade300
+                  : AppTheme.primaryOrange.withValues(alpha: 0.15),
+              child: Icon(
+                Icons.groups_rounded,
+                color: isArquivada ? Colors.grey.shade600 : AppTheme.primaryOrange,
+              ),
             ),
-          );
-          _loadTurmas();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      turma['nome'] ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
+            title: Text(
+              t['nome'] ?? '',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                decoration: isArquivada ? TextDecoration.lineThrough : null,
+              ),
+            ),
+            subtitle: Text(
+              '${t['ano_escolar'] ?? '1º Ano'} • ${t['turno'] ?? 'MANHA'} • ${t['total_alunos'] ?? 0} alunos',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isArquivada)
+                  IconButton(
+                    icon: const Icon(Icons.archive_outlined, color: Colors.orange),
+                    onPressed: () => _arquivarTurma(t['id'], t['nome']),
+                    tooltip: 'Arquivar Turma',
                   ),
-                  if (isArquivada)
-                    const Chip(
-                      label: Text('Arquivada', style: TextStyle(fontSize: 10, color: Colors.white)),
-                      backgroundColor: Colors.grey,
-                      padding: EdgeInsets.zero,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                turma['descricao'] ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              Row(
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TurmaDetailScreen(turmaId: t['id']),
+                ),
+              ).then((_) => _loadTurmas());
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.1,
+      ),
+      itemCount: _turmas.length,
+      itemBuilder: (context, index) {
+        final t = _turmas[index];
+        final isArquivada = t['arquivada_em'] != null;
+
+        return Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TurmaDetailScreen(turmaId: t['id']),
+                ),
+              ).then((_) => _loadTurmas());
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.primaryOrange),
-                      const SizedBox(width: 4),
+                      CircleAvatar(
+                        backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
+                        child: const Icon(Icons.groups_rounded, color: AppTheme.primaryOrange),
+                      ),
+                      if (!isArquivada)
+                        IconButton(
+                          icon: const Icon(Icons.archive_outlined, color: Colors.orange, size: 20),
+                          onPressed: () => _arquivarTurma(t['id'], t['nome']),
+                          tooltip: 'Arquivar',
+                        ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '${turma['total_alunos'] ?? 0} alunos',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        t['nome'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${t['ano_escolar'] ?? '1º Ano'} • ${t['total_alunos'] ?? 0} alunos',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
-                  Text(
-                    '${turma['ano_escolar'] ?? ''} • ${turma['turno'] ?? ''}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -21,7 +21,7 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
                     SELECT a.nome || ' ' || a.sobrenome as aluno_nome, t.nome as turma_nome
                     FROM aluno a
                     JOIN turma t ON a.turma_atual_id = t.id
-                    WHERE a.id = %s AND t.professor_id = %s
+                    WHERE a.id::text = %s AND t.professor_id::text = %s
                     """,
                     (aluno_id, professor_id),
                 )
@@ -31,21 +31,36 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
 
                 aluno_nome, turma_nome = aluno_row[0], aluno_row[1]
 
-                # 2. Buscar as notas das até 3 sessões CONCLUIDAS mais recentes (RF-031)
+                # 2. Buscar as notas reais salvas na tabela avaliacao_sessao para este aluno (RF-031)
                 cur.execute(
                     """
                     SELECT s.id, s.iniciada_em::text,
-                           COALESCE((
-                               SELECT nota FROM avaliacao_sessao av WHERE av.sessao_id = s.id LIMIT 1
-                           ), 85.0) as nota
+                           COALESCE(av.nota, 50.0) as nota
                     FROM sessao_atividade s
-                    WHERE s.aluno_id = %s AND s.status = 'CONCLUIDA'
+                    LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
+                    WHERE s.aluno_id::text = %s AND s.status IN ('CONCLUIDA', 'PARCIAL')
                     ORDER BY s.iniciada_em DESC
                     LIMIT 3
                     """,
                     (aluno_id,),
                 )
                 sessoes_rows = cur.fetchall()
+
+                # Se não encontrou sessões com status CONCLUIDA/PARCIAL, busca qualquer sessão
+                if not sessoes_rows:
+                    cur.execute(
+                        """
+                        SELECT s.id, s.iniciada_em::text,
+                               COALESCE(av.nota, 50.0) as nota
+                        FROM sessao_atividade s
+                        LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
+                        WHERE s.aluno_id::text = %s
+                        ORDER BY s.iniciada_em DESC
+                        LIMIT 3
+                        """,
+                        (aluno_id,),
+                    )
+                    sessoes_rows = cur.fetchall()
 
                 ultimas_notas = [float(r[2]) for r in sessoes_rows]
                 total_concluidas = len(ultimas_notas)
@@ -135,7 +150,7 @@ def calcular_metricas_turma(professor_id: str, turma_id: str) -> MetricasTurmaRe
             with conn.cursor() as cur:
                 # 1. Obter nome da turma
                 cur.execute(
-                    "SELECT nome FROM turma WHERE id = %s AND professor_id = %s",
+                    "SELECT nome FROM turma WHERE id::text = %s AND professor_id::text = %s",
                     (turma_id, professor_id),
                 )
                 turma_row = cur.fetchone()
@@ -146,7 +161,7 @@ def calcular_metricas_turma(professor_id: str, turma_id: str) -> MetricasTurmaRe
 
                 # 2. Obter alunos da turma
                 cur.execute(
-                    "SELECT id FROM aluno WHERE turma_atual_id = %s AND arquivado_em IS NULL",
+                    "SELECT id FROM aluno WHERE turma_atual_id::text = %s AND arquivado_em IS NULL",
                     (turma_id,),
                 )
                 alunos_rows = cur.fetchall()

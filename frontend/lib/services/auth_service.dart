@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
 class AuthService {
@@ -10,6 +11,32 @@ class AuthService {
   static String? get token => _token;
   static Map<String, dynamic>? get currentProfessor => _currentProfessor;
   static bool get isLoggedIn => _token != null && _token!.isNotEmpty;
+
+  // 0. Inicializar e carregar token salvo do disco (RF-002)
+  static Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('dtae_jwt_token');
+      final profJson = prefs.getString('dtae_professor_data');
+      if (profJson != null && profJson.isNotEmpty) {
+        _currentProfessor = jsonDecode(profJson) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error initializing AuthService: $e');
+    }
+  }
+
+  static Future<void> _saveSession(String token, Map<String, dynamic> professor) async {
+    _token = token;
+    _currentProfessor = professor;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('dtae_jwt_token', token);
+      await prefs.setString('dtae_professor_data', jsonEncode(professor));
+    } catch (e) {
+      debugPrint('Error saving session: $e');
+    }
+  }
 
   // 1. Cadastrar Novo Professor (RF-001)
   static Future<Map<String, dynamic>> register({
@@ -39,8 +66,7 @@ class AuthService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
-        _token = data['access_token'];
-        _currentProfessor = data['professor'];
+        await _saveSession(data['access_token'], data['professor']);
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': data['detail'] ?? 'Erro no cadastro.'};
@@ -71,8 +97,7 @@ class AuthService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200) {
-        _token = data['access_token'];
-        _currentProfessor = data['professor'];
+        await _saveSession(data['access_token'], data['professor']);
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': data['detail'] ?? 'E-mail ou senha incorretos.'};
@@ -99,6 +124,8 @@ class AuthService {
 
       if (response.statusCode == 200) {
         _currentProfessor = jsonDecode(response.body) as Map<String, dynamic>;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('dtae_professor_data', jsonEncode(_currentProfessor));
         return _currentProfessor;
       }
       return null;
@@ -137,6 +164,8 @@ class AuthService {
 
       if (response.statusCode == 200) {
         _currentProfessor = jsonDecode(response.body) as Map<String, dynamic>;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('dtae_professor_data', jsonEncode(_currentProfessor));
         return true;
       }
       return false;
@@ -147,8 +176,15 @@ class AuthService {
   }
 
   // 5. Logout
-  static void logout() {
+  static Future<void> logout() async {
     _token = null;
     _currentProfessor = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('dtae_jwt_token');
+      await prefs.remove('dtae_professor_data');
+    } catch (e) {
+      debugPrint('Error logging out: $e');
+    }
   }
 }

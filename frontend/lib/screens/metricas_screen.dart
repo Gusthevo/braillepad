@@ -97,7 +97,7 @@ class _MetricasScreenState extends State<MetricasScreen> {
       case 'AMARELO':
         bg = Colors.amber.shade800;
         icon = Icons.warning_amber_rounded;
-        label = '🟡 Amarelo (Em Desenvolvimento)';
+        label = '🟡 Amarelo (Em Desenvolv.)';
         break;
       case 'VERMELHO':
         bg = Colors.red.shade600;
@@ -107,14 +107,34 @@ class _MetricasScreenState extends State<MetricasScreen> {
       default:
         bg = Colors.grey.shade600;
         icon = Icons.help_outline_rounded;
-        label = '⚪ Cinza (Dados Insuficientes)';
+        label = '⚪ Cinza (Dados Insufic.)';
     }
 
-    return Chip(
-      avatar: Icon(icon, color: Colors.white, size: 16),
-      label: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-      backgroundColor: bg,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -212,7 +232,7 @@ class _MetricasScreenState extends State<MetricasScreen> {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 1. Status Colorido do Aluno (RF-031)
+                            // 1. Status Colorido do Aluno (RF-031) - Margem Fixada com Expanded
                             if (_metricasAluno != null) ...[
                               Card(
                                 child: Padding(
@@ -221,12 +241,16 @@ class _MetricasScreenState extends State<MetricasScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            _metricasAluno!['aluno_nome'] ?? 'Aluno',
-                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                          Expanded(
+                                            child: Text(
+                                              _metricasAluno!['aluno_nome'] ?? 'Aluno',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                            ),
                                           ),
+                                          const SizedBox(width: 8),
                                           _buildStatusColoridoBadge(_metricasAluno!['status_colorido'] ?? 'CINZA'),
                                         ],
                                       ),

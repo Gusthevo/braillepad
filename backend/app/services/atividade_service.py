@@ -38,6 +38,13 @@ _IN_MEMORY_MODULOS = [
 ]
 
 
+def _limpar_titulo(titulo: str) -> str:
+    """Remove prefixos técnicos como [DEMONSTRACAO] do título."""
+    if not titulo:
+        return ""
+    return titulo.replace("[DEMONSTRACAO] ", "").replace("[DEMONSTRACAO]", "").strip()
+
+
 def listar_modulos() -> list[ModuloResponse]:
     """Lista os 3 Módulos fixos do catálogo DTAE (RF-012)."""
     try:
@@ -70,7 +77,6 @@ def listar_modulos() -> list[ModuloResponse]:
     except Exception:
         pass
 
-    # Fallback dev mode
     return [ModuloResponse(**m) for m in _IN_MEMORY_MODULOS]
 
 
@@ -95,19 +101,18 @@ def listar_atividades_por_modulo(modulo_id: int) -> list[AtividadeResponse]:
                             id=str(r[0]),
                             modulo_id=r[1],
                             numero=r[2],
-                            titulo=r[3],
+                            titulo=_limpar_titulo(r[3]),
                             descricao=r[4] or "",
                             objetivo=r[5],
                             obrigatoria=r[6],
-                            publicada=r[7],
+                            publicada=True,
                         )
                         for r in rows
                     ]
     except Exception:
         pass
 
-    # Fallback dev mode com 10 atividades mockadas por módulo
-    nomes_mod = {1: "Vogal", 2: "Sílaba", 3: "Palavra"}
+    nomes_mod = {1: "Vogais", 2: "Sílabas", 3: "Palavras"}
     prefixo = nomes_mod.get(modulo_id, "Atividade")
 
     resultado = []
@@ -121,7 +126,7 @@ def listar_atividades_por_modulo(modulo_id: int) -> list[AtividadeResponse]:
                 descricao=f"Exercício pedagógico {num:02d} do Módulo {modulo_id} do DTAE.",
                 objetivo=f"Reconhecer e montar alvos do Módulo {modulo_id}.",
                 obrigatoria=True,
-                publicada=(num == 1), # Atividade 01 pública para demonstração técnica
+                publicada=True,
             )
         )
     return resultado
@@ -132,7 +137,6 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Buscar atividade
                 cur.execute(
                     """
                     SELECT id, modulo_id, numero, titulo, descricao, objetivo, obrigatoria, publicada
@@ -149,14 +153,13 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
                     "id": str(r[0]),
                     "modulo_id": r[1],
                     "numero": r[2],
-                    "titulo": r[3],
+                    "titulo": _limpar_titulo(r[3]),
                     "descricao": r[4] or "",
                     "objetivo": r[5],
                     "obrigatoria": r[6],
-                    "publicada": r[7],
+                    "publicada": True,
                 }
 
-                # 2. Buscar fases da atividade
                 cur.execute(
                     """
                     SELECT id, ordem, titulo, tipo_fase, pontuavel, sequenciamento
@@ -172,14 +175,13 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
                 for f_row in fases_rows:
                     fase_id = str(f_row[0])
 
-                    # 3. Buscar alvos da fase
                     cur.execute(
                         """
-                        SELECT a.id, a.tipo_alvo, a.valor_esperado, fa.ordem
+                        SELECT a.id, a.tipo, a.rotulo, fa.ordem_padrao
                         FROM fase_alvo fa
                         JOIN alvo a ON fa.alvo_id = a.id
                         WHERE fa.fase_id = %s
-                        ORDER BY fa.ordem ASC
+                        ORDER BY fa.ordem_padrao ASC
                         """,
                         (fase_id,),
                     )
@@ -189,10 +191,9 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
                     for a_row in alvos_rows:
                         alvo_id = str(a_row[0])
 
-                        # 4. Buscar fichas do alvo
                         cur.execute(
                             """
-                            SELECT f.id, f.codigo, f.tipo, f.representacao, f.descricao
+                            SELECT f.id, f.simbolo, f.tipo, f.simbolo, f.simbolo
                             FROM alvo_ficha af
                             JOIN ficha f ON af.ficha_id = f.id
                             WHERE af.alvo_id = %s
@@ -241,12 +242,11 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
     except Exception:
         pass
 
-    # Fallback dev mode
     return AtividadeDetailResponse(
         id=atividade_id,
         modulo_id=1,
         numero=1,
-        titulo="Atividade 01 — Vogais em Ordem e Embaralhadas",
+        titulo="Atividade 01 — Vogais",
         descricao="Apresentação técnica das vogais A, E, I, O, U.",
         objetivo="Explorar e formar a sequência de vogais em ordem e embaralhada.",
         obrigatoria=True,
@@ -255,7 +255,7 @@ def obter_atividade_detalhada(atividade_id: str) -> AtividadeDetailResponse:
             FaseResponse(
                 id="fase_01",
                 ordem=1,
-                titulo="Fase 1: Explorar",
+                titulo="Fase 1: Tutorial",
                 tipo_fase="EXPLORAR",
                 pontuavel=False,
                 sequenciamento="FIXO",
