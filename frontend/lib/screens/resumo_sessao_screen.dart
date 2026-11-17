@@ -113,6 +113,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
             children: [
               Expanded(
                 child: ListView(
+                  physics: const BouncingScrollPhysics(),
                   children: [
                     // Header Resumo Card com Temporizador e Taxa de Acertos Real
                     Card(
@@ -124,38 +125,48 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                             Text(
                               'Aluno: ${widget.sessao['aluno_nome'] ?? 'Aluno DTAE'}',
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Atividade: ${widget.sessao['atividade_titulo'] ?? 'Atividade 01 — Vogais'}',
                               style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      pctAcertos >= 75.0
-                                          ? Icons.check_circle_rounded
-                                          : (pctAcertos >= 50.0 ? Icons.warning_amber_rounded : Icons.cancel_rounded),
-                                      color: pctAcertos >= 75.0 ? Colors.green : (pctAcertos >= 50.0 ? Colors.orange : Colors.red),
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Acertos: ${pctAcertos.toStringAsFixed(1)}%',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: pctAcertos >= 75.0
-                                            ? Colors.green.shade800
-                                            : (pctAcertos >= 50.0 ? Colors.orange.shade900 : Colors.red.shade800),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        pctAcertos >= 75.0
+                                            ? Icons.check_circle_rounded
+                                            : (pctAcertos >= 50.0 ? Icons.warning_amber_rounded : Icons.cancel_rounded),
+                                        color: pctAcertos >= 75.0 ? Colors.green : (pctAcertos >= 50.0 ? Colors.orange : Colors.red),
+                                        size: 18,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Acertos: ${pctAcertos.toStringAsFixed(1)}%',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: pctAcertos >= 75.0
+                                                ? Colors.green.shade800
+                                                : (pctAcertos >= 50.0 ? Colors.orange.shade900 : Colors.red.shade800),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 Row(
                                   children: [
                                     const Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 18),
@@ -205,6 +216,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     // Pergunta 1: Fase 01
                     DropdownButtonFormField<String>(
                       initialValue: _nivelAuxilioFase1,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 1 — Nível de auxílio na Fase 01',
                         prefixIcon: const Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
@@ -213,12 +225,12 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'INDEPENDENTE', child: Text('Independente, sem auxílio')),
-                        DropdownMenuItem(value: 'REPETICAO', child: Text('Precisou repetição de instruções')),
-                        DropdownMenuItem(value: 'VERBAL', child: Text('Orientações verbais')),
-                        DropdownMenuItem(value: 'TATIL', child: Text('Demonstração / Orientação tátil')),
-                        DropdownMenuItem(value: 'DIRETO', child: Text('Auxílio direto e frequente')),
-                        DropdownMenuItem(value: 'VARIOU', child: Text('Nível de auxílio variou')),
+                        DropdownMenuItem(value: 'INDEPENDENTE', child: Text('Independente, sem auxílio', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'REPETICAO', child: Text('Precisou repetição de instruções', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'VERBAL', child: Text('Orientações verbais', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'TATIL', child: Text('Demonstração / Orientação tátil', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'DIRETO', child: Text('Auxílio direto e frequente', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'VARIOU', child: Text('Nível de auxílio variou', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _nivelAuxilioFase1 = val);
@@ -230,6 +242,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     // Pergunta 2: Fase 02
                     DropdownButtonFormField<String>(
                       initialValue: _nivelAuxilioFase2,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 2 — Nível de auxílio na Fase 02',
                         prefixIcon: const Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
@@ -238,12 +251,12 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'INDEPENDENTE', child: Text('Independente, sem auxílio')),
-                        DropdownMenuItem(value: 'REPETICAO', child: Text('Precisou repetição de instruções')),
-                        DropdownMenuItem(value: 'VERBAL', child: Text('Orientações verbais')),
-                        DropdownMenuItem(value: 'TATIL', child: Text('Demonstração / Orientação tátil')),
-                        DropdownMenuItem(value: 'DIRETO', child: Text('Auxílio direto e frequente')),
-                        DropdownMenuItem(value: 'VARIOU', child: Text('Nível de auxílio variou')),
+                        DropdownMenuItem(value: 'INDEPENDENTE', child: Text('Independente, sem auxílio', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'REPETICAO', child: Text('Precisou repetição de instruções', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'VERBAL', child: Text('Orientações verbais', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'TATIL', child: Text('Demonstração / Orientação tátil', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'DIRETO', child: Text('Auxílio direto e frequente', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'VARIOU', child: Text('Nível de auxílio variou', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _nivelAuxilioFase2 = val);
@@ -255,6 +268,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     // Pergunta 3: Compreensão
                     DropdownButtonFormField<String>(
                       initialValue: _compreensaoInstrucoes,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 3 — Compreendeu as instruções?',
                         prefixIcon: const Icon(Icons.psychology_outlined, color: AppTheme.primaryOrange),
@@ -263,10 +277,10 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'SIM', child: Text('Sim, compreendeu e realizou')),
-                        DropdownMenuItem(value: 'PARCIAL', child: Text('Compreendeu parcialmente')),
-                        DropdownMenuItem(value: 'REPETIDAS', child: Text('Precisou de repetidas explicações')),
-                        DropdownMenuItem(value: 'NAO_AVALIADO', child: Text('Não foi possível avaliar')),
+                        DropdownMenuItem(value: 'SIM', child: Text('Sim, compreendeu e realizou', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'PARCIAL', child: Text('Compreendeu parcialmente', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'REPETIDAS', child: Text('Precisou de repetidas explicações', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'NAO_AVALIADO', child: Text('Não foi possível avaliar', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _compreensaoInstrucoes = val);
@@ -278,6 +292,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     // Pergunta 4: Autonomia
                     DropdownButtonFormField<String>(
                       initialValue: _autonomiaExploracao,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 4 — Autonomia na exploração das fichas',
                         prefixIcon: const Icon(Icons.explore_outlined, color: AppTheme.primaryOrange),
@@ -286,10 +301,10 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'SIM', child: Text('Sim, explorou autonomamente')),
-                        DropdownMenuItem(value: 'PARCIAL', child: Text('Parcialmente, precisou orientações')),
-                        DropdownMenuItem(value: 'NAO', child: Text('Não, precisou auxílio frequente')),
-                        DropdownMenuItem(value: 'NAO_AVALIADO', child: Text('Não foi possível avaliar')),
+                        DropdownMenuItem(value: 'SIM', child: Text('Sim, explorou autonomamente', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'PARCIAL', child: Text('Parcialmente, precisou orientações', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'NAO', child: Text('Não, precisou auxílio frequente', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'NAO_AVALIADO', child: Text('Não foi possível avaliar', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _autonomiaExploracao = val);
