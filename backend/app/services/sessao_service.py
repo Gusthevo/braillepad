@@ -258,7 +258,9 @@ def obter_sessao_ativa(professor_id: str) -> Optional[SessaoResponse]:
 def registrar_leitura_ficha(
     professor_id: str, sessao_id: str, request: LeituraFichaRequest
 ) -> dict:
-    """Registra um evento de leitura de ficha (RF-023) gravando a tentativa no PostgreSQL."""
+    """
+    Registra um evento de leitura de ficha (RF-023) no PostgreSQL sem sobrescrever histórico.
+    """
     leitura_id = str(uuid.uuid4())
 
     try:
@@ -273,7 +275,6 @@ def registrar_leitura_ficha(
                         status_code=404, detail="Sessão ativa em andamento não encontrada."
                     )
 
-                # 1. Buscar ou criar execucao_alvo e tentativa no PostgreSQL para registrar a leitura
                 symbol = request.ficha_codigo.replace("FICHA_", "").replace("VOGAL_", "").strip()
 
                 cur.execute("SELECT id FROM ficha WHERE simbolo = %s LIMIT 1", (symbol,))
@@ -285,7 +286,6 @@ def registrar_leitura_ficha(
                     f_default = cur.fetchone()
                     ficha_id = str(f_default[0]) if f_default else None
 
-                # Buscar primeira fase_alvo_id para o vinculo de execucao_alvo
                 cur.execute(
                     """
                     SELECT fa.id
@@ -325,13 +325,19 @@ def registrar_leitura_ficha(
                     )
                     tent_real_id = cur.fetchone()[0]
 
+                    # Descobrir a próxima posição de leitura sem sobrescrever anteriores
+                    cur.execute(
+                        "SELECT COALESCE(MAX(posicao), 0) + 1 FROM leitura_ficha WHERE tentativa_id::text = %s",
+                        (tent_real_id,),
+                    )
+                    next_pos = cur.fetchone()[0]
+
                     cur.execute(
                         """
                         INSERT INTO leitura_ficha (id, tentativa_id, posicao, ficha_esperada_id, ficha_apresentada_id, correta, origem_registro)
                         VALUES (%s::uuid, %s::uuid, %s, %s::uuid, %s::uuid, %s, 'MANUAL')
-                        ON CONFLICT (tentativa_id, posicao) DO UPDATE SET correta = EXCLUDED.correta
                         """,
-                        (leitura_id, tent_real_id, max(request.posicao, 1), ficha_id, ficha_id, request.correta),
+                        (leitura_id, tent_real_id, next_pos, ficha_id, ficha_id, request.correta),
                     )
 
                 conn.commit()
@@ -417,10 +423,13 @@ def finalizar_sessao(
                 tot_reads = read_row[0] if read_row else 0
                 tot_hits = read_row[1] if read_row else 0
 
-                # Se a consulta no banco não encontrou (dev mode fallback), usa os dados do request enviados pelo Flutter
-                if tot_reads == 0 and (request.total_tentativas or 0) > 0:
-                    tot_reads = request.total_tentativas or 0
-                    tot_hits = request.total_acertos or 0
+                # Se a consulta no banco encontrou menos leituras que os toques enviados pelo Flutter, usa o total do request enviado
+                req_tentativas = request.total_tentativas or 0
+                req_acertos = request.total_acertos or 0
+
+                if req_tentativas > tot_reads:
+                    tot_reads = req_tentativas
+                    tot_hits = req_acertos
 
                 if tot_reads > 0:
                     percentual_acertos = round(float((tot_hits / tot_reads) * 100.0), 1)

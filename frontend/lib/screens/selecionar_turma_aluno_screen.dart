@@ -189,7 +189,8 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
       body: SafeArea(
         child: _isLoadingTurmas
             ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
-            : Padding(
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,7 +311,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                                 },
                               ),
 
-                    const Spacer(),
+                    const SizedBox(height: 32),
 
                     // Iniciar Atendimento Button
                     SizedBox(

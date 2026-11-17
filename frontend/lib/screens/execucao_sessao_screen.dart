@@ -259,11 +259,13 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
           automaticallyImplyLeading: false,
         ),
         body: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -339,7 +341,8 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
@@ -489,12 +492,12 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               Card(
                 color: Colors.white,
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
                     children: [
                       Text(
@@ -503,11 +506,11 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                             : '$_tipoAlvoNome Solicitada no PAD:',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        width: 110,
-                        height: 110,
+                        width: 90,
+                        height: 90,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: _getCorDesempenhoCentral(),
@@ -528,14 +531,14 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   color: Colors.white,
-                                  fontSize: _etapaAtual == EtapaAtividade.tutorial ? 24 : 48,
+                                  fontSize: _etapaAtual == EtapaAtividade.tutorial ? 24 : 44,
                                 ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
                         _etapaAtual == EtapaAtividade.tutorial
                             ? 'Aproxime qualquer ficha no leitor RFID do PAD para ouvir a resposta do aparelho.'
@@ -548,22 +551,22 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               Text(
                 'Fichas de $_tipoAlvoNome Apresentadas no PAD:',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 alignment: WrapAlignment.center,
                 children: _alvosAtividade.map((a) {
                   return SizedBox(
-                    width: a.length > 3 ? 90 : (a.length > 2 ? 72 : 56),
-                    height: 52,
+                    width: a.length > 3 ? 84 : (a.length > 2 ? 68 : 54),
+                    height: 48,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -573,7 +576,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                           borderRadius: BorderRadius.circular(14),
                           side: const BorderSide(color: AppTheme.primaryOrange, width: 2),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
                       onPressed: () => _registrarResposta(a),
                       child: FittedBox(
@@ -587,7 +590,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                 }).toList(),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 20),
 
               Row(
                 children: [
