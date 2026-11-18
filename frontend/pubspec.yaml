@@ -12,6 +12,10 @@ dependencies:
   cupertino_icons: ^1.0.6
   http: ^1.2.0
   shared_preferences: ^2.2.2
+  # BLE: fixar versoes para estabilizar a integracao.
+  flutter_blue_plus: 2.3.15
+  permission_handler: 12.0.1
+  device_info_plus: 11.5.0
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +27,4 @@ flutter:
 
   assets:
     - assets/images/
+

@@ -6,11 +6,13 @@ from ..schemas.metricas_schema import (
     MetricasTurmaResponse,
     AlertaPedagógicoResponse,
 )
+from .sessao_service import _IN_MEMORY_SESSOES
 
 
 def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoResponse:
     """
     Calcula as métricas pedagógicas, status colorido e alertas de um aluno (RF-031, RF-032).
+    Calcula a nota real e atualiza a cada atividade concluída ou parcial.
     """
     try:
         with get_db_connection() as conn:
@@ -31,11 +33,21 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
 
                 aluno_nome, turma_nome = aluno_row[0], aluno_row[1]
 
-                # 2. Buscar as notas reais salvas na tabela avaliacao_sessao para este aluno (RF-031)
+                # 2. Buscar as notas reais salvas ou calcular a taxa real de acertos das fichas (RF-031)
                 cur.execute(
                     """
                     SELECT s.id, s.iniciada_em::text,
-                           COALESCE(av.nota, 50.0) as nota
+                           COALESCE(
+                               av.nota,
+                               (
+                                   SELECT ROUND((COUNT(*) FILTER (WHERE correta = TRUE)::numeric / NULLIF(COUNT(*), 0)) * 100, 1)
+                                   FROM leitura_ficha lf
+                                   JOIN tentativa t ON lf.tentativa_id = t.id
+                                   JOIN execucao_alvo ea ON t.execucao_alvo_id = ea.id
+                                   WHERE ea.sessao_id = s.id
+                               ),
+                               80.0
+                           ) as nota
                     FROM sessao_atividade s
                     LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
                     WHERE s.aluno_id::text = %s AND s.status IN ('CONCLUIDA', 'PARCIAL')
@@ -46,12 +58,22 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
                 )
                 sessoes_rows = cur.fetchall()
 
-                # Se não encontrou sessões com status CONCLUIDA/PARCIAL, busca qualquer sessão
+                # Se não encontrou sessões com status CONCLUIDA/PARCIAL, buscar qualquer sessão do aluno
                 if not sessoes_rows:
                     cur.execute(
                         """
                         SELECT s.id, s.iniciada_em::text,
-                               COALESCE(av.nota, 50.0) as nota
+                               COALESCE(
+                                   av.nota,
+                                   (
+                                       SELECT ROUND((COUNT(*) FILTER (WHERE correta = TRUE)::numeric / NULLIF(COUNT(*), 0)) * 100, 1)
+                                       FROM leitura_ficha lf
+                                       JOIN tentativa t ON lf.tentativa_id = t.id
+                                       JOIN execucao_alvo ea ON t.execucao_alvo_id = ea.id
+                                       WHERE ea.sessao_id = s.id
+                                   ),
+                                   80.0
+                               ) as nota
                         FROM sessao_atividade s
                         LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
                         WHERE s.aluno_id::text = %s
@@ -65,13 +87,13 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
                 ultimas_notas = [float(r[2]) for r in sessoes_rows]
                 total_concluidas = len(ultimas_notas)
 
-                # 3. Regra RF-031: Status Colorido
-                if total_concluidas < 2:
+                # 3. Regra RF-031: Status Colorido atualizado desde a 1ª atividade
+                if total_concluidas == 0:
                     status_colorido = "CINZA"
-                    descricao_status = "Dados insuficientes (menos de 2 atividades concluídas)."
-                    media_notas = sum(ultimas_notas) / len(ultimas_notas) if ultimas_notas else None
+                    descricao_status = "Nenhuma atividade concluída ainda."
+                    media_notas = None
                 else:
-                    media_notas = sum(ultimas_notas) / len(ultimas_notas)
+                    media_notas = round(sum(ultimas_notas) / total_concluidas, 1)
                     if media_notas >= 75.0:
                         status_colorido = "VERDE"
                         descricao_status = "Faz com autonomia; pode avançar."
@@ -121,23 +143,47 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
     except HTTPException:
         raise
     except Exception:
-        # Fallback dev mode
+        # Fallback dinâmico em memória para ambiente de dev/sem PostgreSQL
+        notas_mem = []
+        for s in _IN_MEMORY_SESSOES.values():
+            if str(s.get("aluno_id")) == str(aluno_id):
+                n = s.get("nota")
+                if n is not None:
+                    notas_mem.append(float(n))
+
+        if notas_mem:
+            total_c = len(notas_mem)
+            media_m = round(sum(notas_mem) / total_c, 1)
+            st_color = "VERDE" if media_m >= 75.0 else ("AMARELO" if media_m >= 50.0 else "VERMELHO")
+            desc_m = "Faz com autonomia; pode avançar." if st_color == "VERDE" else "Em desenvolvimento."
+            return MetricasAlunoResponse(
+                aluno_id=aluno_id,
+                aluno_nome="Aluno DTAE",
+                turma_nome="Turma DTAE",
+                status_colorido=st_color,
+                descricao_status=desc_m,
+                media_notas=media_m,
+                total_sessoes_concluidas=total_c,
+                ultimas_notas=notas_mem[-3:],
+                alertas=[
+                    AlertaPedagógicoResponse(
+                        tipo="EVOLUCAO",
+                        titulo="Atividade Concluída com Sucesso",
+                        mensagem=f"Última nota registrada: {notas_mem[-1]:.1f} pts.",
+                    )
+                ],
+            )
+
         return MetricasAlunoResponse(
             aluno_id=aluno_id,
             aluno_nome="Aluno DTAE",
-            turma_nome="Turma Exemplo",
-            status_colorido="VERDE",
-            descricao_status="Faz com autonomia; pode avançar.",
-            media_notas=88.5,
-            total_sessoes_concluidas=3,
-            ultimas_notas=[90.0, 88.0, 85.0],
-            alertas=[
-                AlertaPedagógicoResponse(
-                    tipo="EVOLUCAO",
-                    titulo="Evolução Contínua em Crescimento",
-                    mensagem="O aluno apresenta crescimento consecutivo no estudo de Braille!",
-                )
-            ],
+            turma_nome="Turma DTAE",
+            status_colorido="CINZA",
+            descricao_status="Nenhuma atividade concluída ainda.",
+            media_notas=None,
+            total_sessoes_concluidas=0,
+            ultimas_notas=[],
+            alertas=[],
         )
 
 

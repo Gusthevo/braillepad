@@ -286,7 +286,89 @@ class _MetricasScreenState extends State<MetricasScreen> {
                                 ),
                               ),
 
-                              // 2. Alertas Pedagógicos (RF-032)
+                              // 2. Histórico das Últimas Atividades / Notas
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Histórico de Notas Recentes:',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                              ),
+                              const SizedBox(height: 8),
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if ((_metricasAluno!['ultimas_notas'] as List?)?.isNotEmpty == true) ...[
+                                        ...(_metricasAluno!['ultimas_notas'] as List).asMap().entries.map((entry) {
+                                          final idx = entry.key + 1;
+                                          final nota = (entry.value as num).toDouble();
+                                          final isGreen = nota >= 75.0;
+                                          final isYellow = nota >= 50.0 && nota < 75.0;
+                                          final badgeColor = isGreen
+                                              ? Colors.green.shade700
+                                              : (isYellow ? Colors.amber.shade800 : Colors.red.shade700);
+
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                            child: Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 14,
+                                                  backgroundColor: badgeColor.withValues(alpha: 0.15),
+                                                  child: Text(
+                                                    '$idx',
+                                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: badgeColor),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Atividade #$idx',
+                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      ClipRRect(
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        child: LinearProgressIndicator(
+                                                          value: (nota / 100.0).clamp(0.0, 1.0),
+                                                          backgroundColor: Colors.grey.shade200,
+                                                          color: badgeColor,
+                                                          minHeight: 6,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  '${nota.toStringAsFixed(1)} pts',
+                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: badgeColor),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      ] else ...[
+                                        const Center(
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(vertical: 12.0),
+                                            child: Text(
+                                              'Nenhum histórico de notas registrado ainda.',
+                                              style: TextStyle(color: Colors.grey, fontSize: 13),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // 3. Alertas Pedagógicos (RF-032)
                               if ((_metricasAluno!['alertas'] as List?)?.isNotEmpty == true) ...[
                                 const SizedBox(height: 16),
                                 const Text(

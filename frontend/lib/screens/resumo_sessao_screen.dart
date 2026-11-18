@@ -25,6 +25,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
   int _avaliacaoEstrelas = 5;
 
   bool _isSaving = false;
+  bool _salvoComSucesso = false;
 
   final Map<int, String> _descricoesEstrelas = const {
     1: '★ Reconhecimento ainda não demonstrado.',
@@ -46,7 +47,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
     return '${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
   }
 
-  Future<void> _salvarAvaliacao() async {
+  Future<void> _salvarAvaliacao({bool silent = false}) async {
     setState(() => _isSaving = true);
 
     final durSec = (widget.sessao['duracao_segundos'] as int?) ?? 0;
@@ -63,15 +64,32 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
     );
 
     if (mounted) {
-      setState(() => _isSaving = false);
-      if (res != null) {
+      setState(() {
+        _isSaving = false;
+        if (res != null) {
+          _salvoComSucesso = true;
+        }
+      });
+      if (res != null && !silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Avaliação pedagógica e observações salvas com sucesso!'),
+            content: Text('Atividade encerrada com sucesso! Métricas do aluno salvas.'),
             backgroundColor: Colors.green,
           ),
         );
       }
+    }
+  }
+
+  Future<void> _encerrarAtividadeEVoltar() async {
+    if (!_salvoComSucesso) {
+      await _salvarAvaliacao(silent: true);
+    }
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainShellScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -371,11 +389,13 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     const SizedBox(height: 16),
 
                     ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _salvarAvaliacao,
-                      icon: const Icon(Icons.save_rounded),
-                      label: Text(_isSaving ? 'Salvando...' : 'Salvar Avaliação pelo Professor'),
+                      onPressed: _isSaving ? null : () => _salvarAvaliacao(silent: false),
+                      icon: Icon(_salvoComSucesso ? Icons.check_circle_rounded : Icons.save_rounded),
+                      label: Text(_isSaving
+                          ? 'Salvando...'
+                          : (_salvoComSucesso ? 'Avaliação Salva com Sucesso ✓' : 'Salvar Avaliação do Professor')),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryOrange,
+                        backgroundColor: _salvoComSucesso ? Colors.green.shade700 : AppTheme.primaryOrange,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),
@@ -401,16 +421,11 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const MainShellScreen()),
-                          (route) => false,
-                        );
-                      },
-                      icon: const Icon(Icons.home_rounded),
-                      label: const Text('Dashboard'),
+                      onPressed: _encerrarAtividadeEVoltar,
+                      icon: const Icon(Icons.check_circle_outline_rounded),
+                      label: const Text('Encerrar Atividade'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryOrange,
+                        backgroundColor: Colors.green.shade700,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),

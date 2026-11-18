@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
+import '../services/braillepad_ble_service.dart';
 import '../theme/app_theme.dart';
 
 class HealthPadScreen extends StatelessWidget {
@@ -6,69 +9,135 @@ class HealthPadScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.warmBackground,
-      appBar: AppBar(
-        title: const Text('Health PAD'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.sensors_off_rounded,
-                  size: 64,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Equipamento PAD Não Conectado',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'A integração física com o leitor RFID e feedback por hardware não faz parte desta versão do MVP. Os testes e validações acontecem no modo manual ou simulado.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 36),
-              ElevatedButton.icon(
-                onPressed: null, // Desabilitado conforme RF-034
-                icon: const Icon(Icons.sync_disabled_rounded),
-                label: const Text('Testar Conectividade (Desabilitado)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-              ),
-            ],
+    final ble = BraillepadBleService.instance;
+
+    return AnimatedBuilder(
+      animation: ble,
+      builder: (context, _) {
+        final isConnected = ble.connected;
+        final color = isConnected ? Colors.green.shade700 : Colors.grey.shade600;
+
+        return Scaffold(
+          backgroundColor: AppTheme.warmBackground,
+          appBar: AppBar(
+            title: const Text('Health PAD'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
-        ),
-      ),
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const SizedBox(height: 28),
+                Center(
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: isConnected
+                          ? Colors.green.shade50
+                          : Colors.grey.shade200,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isConnected
+                          ? Icons.bluetooth_connected_rounded
+                          : Icons.bluetooth_disabled_rounded,
+                      size: 62,
+                      color: color,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  isConnected
+                      ? 'Equipamento PAD Conectado'
+                      : 'Equipamento PAD Não Conectado',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  ble.status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+                if (isConnected && ble.deviceId != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Identificador: ${ble.deviceId}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+                const SizedBox(height: 32),
+                if (!isConnected)
+                  ElevatedButton.icon(
+                    onPressed: ble.busy ? null : () => ble.scan(),
+                    icon: Icon(ble.scanning
+                        ? Icons.sync_rounded
+                        : Icons.bluetooth_searching_rounded),
+                    label: Text(ble.scanning
+                        ? 'Buscando BRAILLEPAD...'
+                        : 'Buscar BRAILLEPAD'),
+                  ),
+                if (ble.connecting) ...[
+                  const SizedBox(height: 18),
+                  const LinearProgressIndicator(),
+                ],
+                if (isConnected)
+                  OutlinedButton.icon(
+                    onPressed: ble.connecting ? null : () => ble.disconnect(),
+                    icon: const Icon(Icons.bluetooth_disabled_rounded),
+                    label: const Text('Desconectar'),
+                  ),
+                if (!isConnected && ble.foundDevices.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Dispositivos encontrados',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final BluetoothDevice device in ble.foundDevices)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.bluetooth_rounded,
+                          color: AppTheme.primaryOrange,
+                        ),
+                        title: const Text('BRAILLEPAD'),
+                        subtitle: Text(device.remoteId.str),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        enabled: !ble.busy,
+                        onTap: ble.busy ? null : () => ble.connect(device),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 20),
+                Text(
+                  'Conexão local via Bluetooth Low Energy (BLE).',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
