@@ -4,8 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Base URL configuration for Android Emulator vs Desktop/Web
+  // Base URL configuration for Android Emulator vs Desktop/Web vs Physical Device
   static String get baseUrl {
+    const configuredUrl = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: '',
+    );
+
+    if (configuredUrl.isNotEmpty) {
+      return configuredUrl;
+    }
+
     if (!kIsWeb && Platform.isAndroid) {
       return 'http://10.0.2.2:8000'; // Special loopback IP for Android Emulator
     }

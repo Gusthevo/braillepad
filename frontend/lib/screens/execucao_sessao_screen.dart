@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/sessao_service.dart';
+import '../services/braillepad_ble_service.dart';
 import 'resumo_sessao_screen.dart';
 
 enum EtapaAtividade { tutorial, fase01Ordenada, conclusaoFase01, fase02Randomizada }
@@ -36,6 +37,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
 
   int _segundosDecorridos = 0;
   Timer? _timer;
+  StreamSubscription<String>? _rfidSubscription;
 
   @override
   void initState() {
@@ -64,11 +66,20 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
     }
 
     _alvosRandomizados = List.from(_alvosAtividade)..shuffle();
+
+    // Inscrever na escuta de leituras RFID enviadas pelo BraillePad via BLE
+    _rfidSubscription = BraillepadBleService.instance.rfidStream.listen((fichaLida) {
+      if (mounted && _etapaAtual != EtapaAtividade.conclusaoFase01) {
+        debugPrint('[BLE_RFID_LIDO] Ficha RFID aproximada do PAD: $fichaLida');
+        _registrarResposta(fichaLida);
+      }
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _rfidSubscription?.cancel();
     super.dispose();
   }
 

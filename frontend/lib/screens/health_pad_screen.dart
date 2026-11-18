@@ -80,6 +80,65 @@ class HealthPadScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
+                if (isConnected) ...[
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Última ficha RFID lida',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.darkText,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 20,
+                      ),
+                      child: ble.lastReading == null
+                          ? const Center(
+                        child: Text(
+                          'Aproxime uma ficha do leitor RFID no BRAILLEPAD.\n'
+                              'Selecione Leitor RFID ou um dos jogos no dispositivo.',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                          : Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            ble.lastReading!.isRegistered
+                                ? ble.lastReading!.value!
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 64,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryOrange,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            ble.lastReading!.isRegistered
+                                ? '${ble.lastReading!.kind} ${ble.lastReading!.value}'
+                                : 'Ficha não cadastrada',
+                            style: const TextStyle(fontSize: 17),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'UID: ${ble.lastReading!.uid}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 if (!isConnected)
                   ElevatedButton.icon(
