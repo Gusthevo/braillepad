@@ -6,6 +6,15 @@ class AlertaPedagógicoResponse(BaseModel):
     mensagem: str
 
 
+class SessaoHistoricoResponse(BaseModel):
+    sessao_id: str
+    atividade_titulo: str
+    modulo_nome: str
+    data: str = Field(..., description="Data de encerramento da sessão (ISO 8601)")
+    nota: float
+    percentual_acertos: float | None = None
+
+
 class MetricasAlunoResponse(BaseModel):
     aluno_id: str
     aluno_nome: str
@@ -14,7 +23,12 @@ class MetricasAlunoResponse(BaseModel):
     descricao_status: str
     media_notas: float | None = None
     total_sessoes_concluidas: int = 0
+    # Notas da janela usada no status (mais recente primeiro)
     ultimas_notas: list[float] = []
+    # Histórico recente com atividade e data (mais recente primeiro)
+    historico: list[SessaoHistoricoResponse] = []
+    notas_janela: int = 3
+    minimo_notas: int = 2
     alertas: list[AlertaPedagógicoResponse] = []
 
 

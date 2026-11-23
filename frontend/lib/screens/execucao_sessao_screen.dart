@@ -335,17 +335,14 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
 
     final int totTentativas = _totalAcertosFase + _totalErrosFase;
 
+    // Encerra a sessão. A nota é calculada pelo backend a partir das tentativas
+    // gravadas; ajuda e compreensão são confirmadas em seguida pelo professor
+    // na tela de avaliação, que recalcula a nota.
     final resumo = await SessaoService.finalizarSessao(
       widget.sessao['id'],
       duracaoSegundos: _segundosDecorridos,
       totalAcertos: _totalAcertosFase,
       totalTentativas: totTentativas,
-      nivelAuxilioFase1: 'INDEPENDENTE',
-      nivelAuxilioFase2: 'INDEPENDENTE',
-      compreensaoInstrucoes: 'TOTAL',
-      autonomiaExploracao: 'SIM',
-      comentario: 'Atividade e fases finalizadas com sucesso conforme especificação YouthTech.',
-      avaliacaoEstrelas: 5,
     );
 
     if (mounted) {

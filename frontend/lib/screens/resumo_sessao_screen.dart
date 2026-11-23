@@ -116,7 +116,9 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
   Widget build(BuildContext context) {
     final alertas = (widget.sessao['alertas_gerados'] as List?) ?? [];
     final duracaoSec = (widget.sessao['duracao_segundos'] as int?) ?? 0;
-    final pctAcertos = (widget.sessao['percentual_acertos'] as num?)?.toDouble() ?? 100.0;
+    // Null quando não houve leitura em fase pontuável: não exibir 100% falso.
+    final pctAcertosReal = (widget.sessao['percentual_acertos'] as num?)?.toDouble();
+    final pctAcertos = pctAcertosReal ?? -1.0;
 
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
@@ -161,21 +163,25 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                                   child: Row(
                                     children: [
                                       Icon(
-                                        pctAcertos >= 75.0
+                                        pctAcertosReal == null
+                                            ? Icons.help_outline_rounded
+                                            : pctAcertos >= 75.0
                                             ? Icons.check_circle_rounded
                                             : (pctAcertos >= 50.0 ? Icons.warning_amber_rounded : Icons.cancel_rounded),
-                                        color: pctAcertos >= 75.0 ? Colors.green : (pctAcertos >= 50.0 ? Colors.orange : Colors.red),
+                                        color: pctAcertosReal == null ? Colors.grey : (pctAcertos >= 75.0 ? Colors.green : (pctAcertos >= 50.0 ? Colors.orange : Colors.red)),
                                         size: 18,
                                       ),
                                       const SizedBox(width: 6),
                                       Flexible(
                                         child: Text(
-                                          'Acertos: ${pctAcertos.toStringAsFixed(1)}%',
+                                          pctAcertosReal == null ? 'Acertos: —' : 'Acertos: ${pctAcertos.toStringAsFixed(1)}%',
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
-                                            color: pctAcertos >= 75.0
+                                            color: pctAcertosReal == null
+                                                ? Colors.grey.shade700
+                                                : pctAcertos >= 75.0
                                                 ? Colors.green.shade800
                                                 : (pctAcertos >= 50.0 ? Colors.orange.shade900 : Colors.red.shade800),
                                           ),

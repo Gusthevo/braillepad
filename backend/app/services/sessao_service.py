@@ -4,7 +4,9 @@ import logging
 import datetime
 from typing import Optional
 from fastapi import HTTPException, status
+from decimal import Decimal
 from ..core.database import get_db_connection
+from .scoring_service import calcular_nota
 from ..schemas.sessao_schema import (
     SessaoIniciarRequest,
     LeituraFichaRequest,
@@ -527,6 +529,86 @@ def registrar_leitura_ficha(
         }
 
 
+# ---------------------------------------------------------------------------
+# Nota DTAE (docs/03_modelo_relacional.md, seção 5)
+#   nota = média(pontos por tentativas de cada alvo pontuável executado)
+#          + pontos de ajuda (+ pontos de compreensão, apenas em PALAVRAS)
+# Os pesos vêm de parametro_pontuacao da regra ativa da categoria.
+# ---------------------------------------------------------------------------
+_GRAU_AJUDA = {"SEM_AJUDA": 0, "DICA_VERBAL": 1, "MEDIACAO_INTENSA": 2}
+
+
+def _mapear_nivel_ajuda(valor: Optional[str]) -> str:
+    v = (valor or "INDEPENDENTE").upper()
+    if v in ("INDEPENDENTE", "SEM_AJUDA"):
+        return "SEM_AJUDA"
+    if v in ("VERBAL", "REPETICAO", "DICA_VERBAL"):
+        return "DICA_VERBAL"
+    return "MEDIACAO_INTENSA"
+
+
+def _mapear_compreensao(valor: Optional[str]) -> str:
+    c = (valor or "SIM").upper()
+    if c in ("TOTAL", "SIM"):
+        return "SIM"
+    if c in ("PARCIAL", "REPETIDAS", "EM_PARTE"):
+        return "EM_PARTE"
+    return "AINDA_NAO"
+
+
+def _calcular_nota_dtae(cur, sessao_id: str, regra_id: str, nivel_ajuda: str, compreensao: Optional[str]):
+    """Retorna (nota | None, alvos_pontuados, percentual_acertos | None).
+
+    Cada alvo de fase pontuável que a criança chegou a tentar entra na média:
+    acerto na 1ª/2ª/3ª tentativa vale os pontos de "1"/"2"/"3"; acerto na 4ª ou
+    depois, ou alvo não completado, vale "4_PLUS". Alvos que não foram
+    apresentados (sem nenhuma tentativa) não entram na média.
+    """
+    cur.execute(
+        "SELECT criterio, chave, pontos FROM parametro_pontuacao WHERE regra_id = %s::uuid",
+        (regra_id,),
+    )
+    parametros = {(c, k): Decimal(p) for c, k, p in cur.fetchall()}
+
+    cur.execute(
+        """
+        SELECT min(t.numero) FILTER (WHERE t.resultado = 'ACERTO')
+        FROM execucao_alvo ea
+        JOIN fase_alvo fa ON fa.id = ea.fase_alvo_id
+        JOIN fase_atividade f ON f.id = fa.fase_id
+        JOIN tentativa t ON t.execucao_alvo_id = ea.id
+        WHERE ea.sessao_id = %s::uuid AND f.pontuavel
+        GROUP BY ea.id
+        """,
+        (sessao_id,),
+    )
+    tentativas_por_alvo = [n if n is not None else 4 for (n,) in cur.fetchall()]
+
+    cur.execute(
+        """
+        SELECT count(*) FILTER (WHERE lf.correta), count(*)
+        FROM leitura_ficha lf
+        JOIN tentativa t ON t.id = lf.tentativa_id
+        JOIN execucao_alvo ea ON ea.id = t.execucao_alvo_id
+        JOIN fase_alvo fa ON fa.id = ea.fase_alvo_id
+        JOIN fase_atividade f ON f.id = fa.fase_id
+        WHERE ea.sessao_id = %s::uuid AND f.pontuavel
+        """,
+        (sessao_id,),
+    )
+    corretas, total = cur.fetchone()
+    percentual = round(100.0 * corretas / total, 1) if total else None
+
+    if not tentativas_por_alvo:
+        return None, 0, percentual
+    try:
+        nota = calcular_nota(tentativas_por_alvo, nivel_ajuda, compreensao, parametros)
+    except KeyError as e:
+        logger.error("Regra de pontuação %s sem o parâmetro %s; nota não calculada", regra_id, e)
+        return None, 0, percentual
+    return float(nota), len(tentativas_por_alvo), percentual
+
+
 def finalizar_sessao(
     professor_id: str, sessao_id: str, request: SessaoFinalizarRequest
 ) -> SessaoResponse:
@@ -536,17 +618,10 @@ def finalizar_sessao(
     """
     finalizada_em = datetime.datetime.now().isoformat()
     duracao_sec = request.duracao_segundos or 0
+    # Estrelas são a avaliação qualitativa do professor: não entram na nota.
     estrelas = request.avaliacao_estrelas or 5
-
-    req_tentativas = request.total_tentativas or 0
-    req_acertos = request.total_acertos or 0
-    if req_tentativas > 0:
-        percentual_acertos = round(float((req_acertos / req_tentativas) * 100.0), 1)
-    else:
-        percentual_acertos = float(estrelas * 20.0)
-
-    # Nota final calculada (50% desempenho + 50% avaliação de estrelas)
-    nota_calculada = round(float((estrelas * 10.0) + (percentual_acertos * 0.5)), 1)
+    nota_calculada: Optional[float] = None
+    percentual_acertos: Optional[float] = None
 
     try:
         with get_db_connection() as conn:
@@ -643,39 +718,40 @@ def finalizar_sessao(
                 if regra_row:
                     regra_id = str(regra_row[0])
 
-                    # Mapeamento do nível de ajuda (CHECK constraint: SEM_AJUDA, DICA_VERBAL, MEDIACAO_INTENSA)
-                    n_aux = (request.nivel_auxilio_fase1 or 'INDEPENDENTE').upper()
-                    if n_aux in ['INDEPENDENTE', 'SEM_AJUDA']:
-                        nivel_ajuda_db = 'SEM_AJUDA'
-                    elif n_aux in ['VERBAL', 'REPETICAO', 'DICA_VERBAL']:
-                        nivel_ajuda_db = 'DICA_VERBAL'
-                    else:
-                        nivel_ajuda_db = 'MEDIACAO_INTENSA'
-
-                    # Mapeamento de compreensão (Trigger constraint: APENAS PALAVRAS aceita compreensao NOT NULL)
-                    if categoria == 'PALAVRAS':
-                        c_inst = (request.compreensao_instrucoes or 'SIM').upper()
-                        if c_inst in ['TOTAL', 'SIM']:
-                            compreensao_db = 'SIM'
-                        elif c_inst in ['PARCIAL', 'REPETIDAS', 'EM_PARTE']:
-                            compreensao_db = 'EM_PARTE'
-                        else:
-                            compreensao_db = 'AINDA_NAO'
-                    else:
-                        compreensao_db = None
-
-                    cur.execute(
-                        """
-                        INSERT INTO avaliacao_sessao (sessao_id, regra_id, nivel_ajuda, compreensao, nota, alvos_pontuados)
-                        VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s)
-                        ON CONFLICT (sessao_id) DO UPDATE
-                        SET nivel_ajuda = EXCLUDED.nivel_ajuda,
-                            compreensao = EXCLUDED.compreensao,
-                            nota = EXCLUDED.nota,
-                            avaliada_em = now()
-                        """,
-                        (sessao_id, regra_id, nivel_ajuda_db, compreensao_db, nota_calculada, max(len(fa_rows), 1)),
+                    # Ajuda entra uma única vez por sessão: vale o maior nível de
+                    # auxílio informado entre as fases.
+                    nivel_ajuda_db = max(
+                        (_mapear_nivel_ajuda(request.nivel_auxilio_fase1),
+                         _mapear_nivel_ajuda(request.nivel_auxilio_fase2)),
+                        key=_GRAU_AJUDA.__getitem__,
                     )
+                    # Trigger do banco: apenas PALAVRAS aceita compreensão NOT NULL
+                    compreensao_db = (
+                        _mapear_compreensao(request.compreensao_instrucoes)
+                        if categoria == 'PALAVRAS' else None
+                    )
+
+                    nota_calculada, alvos_pontuados, percentual_acertos = _calcular_nota_dtae(
+                        cur, sessao_id, regra_id, nivel_ajuda_db, compreensao_db
+                    )
+
+                    if nota_calculada is not None:
+                        cur.execute(
+                            """
+                            INSERT INTO avaliacao_sessao (sessao_id, regra_id, nivel_ajuda, compreensao, nota, alvos_pontuados)
+                            VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s)
+                            ON CONFLICT (sessao_id) DO UPDATE
+                            SET regra_id = EXCLUDED.regra_id,
+                                nivel_ajuda = EXCLUDED.nivel_ajuda,
+                                compreensao = EXCLUDED.compreensao,
+                                nota = EXCLUDED.nota,
+                                alvos_pontuados = EXCLUDED.alvos_pontuados,
+                                avaliada_em = now()
+                            """,
+                            (sessao_id, regra_id, nivel_ajuda_db, compreensao_db, nota_calculada, alvos_pontuados),
+                        )
+                    else:
+                        logger.warning("Sessão %s sem alvos pontuáveis executados; nota não atribuída", sessao_id)
 
                 # 4. Gravar comentário do professor se houver
                 if request.comentario and request.comentario.strip():
@@ -699,7 +775,11 @@ def finalizar_sessao(
                     AlertaAtividadeResponse(
                         tipo="EVOLUCAO",
                         titulo="Atividade Concluída",
-                        mensagem=f"Nota registrada: {nota_calculada:.1f} pts.",
+                        mensagem=(
+                            f"Nota registrada: {nota_calculada:.1f} pts."
+                            if nota_calculada is not None
+                            else "Nenhum alvo pontuável foi realizado; sessão sem nota."
+                        ),
                     )
                 ]
 

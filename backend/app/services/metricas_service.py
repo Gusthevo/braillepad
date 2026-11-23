@@ -1,26 +1,203 @@
-from typing import Optional
+"""Métricas pedagógicas DTAE (RF-031, RF-032, RF-033).
+
+Regras (docs/03_modelo_relacional.md, seção 6):
+- Só entram sessões CONCLUIDAS com nota (avaliacao_sessao); parciais são ignoradas.
+- Status: média das últimas `notas_janela` notas; CINZA com menos de `minimo_notas`.
+- Limiares e alertas vêm da tabela config_metricas.
+"""
+import logging
+from dataclasses import dataclass
 from fastapi import HTTPException
 from ..core.database import get_db_connection
 from ..schemas.metricas_schema import (
     MetricasAlunoResponse,
     MetricasTurmaResponse,
     AlertaPedagógicoResponse,
+    SessaoHistoricoResponse,
 )
-from .sessao_service import _IN_MEMORY_SESSOES
+
+logger = logging.getLogger(__name__)
+
+HISTORICO_MAXIMO = 10
+
+
+@dataclass
+class _ConfigMetricas:
+    notas_janela: int = 3
+    minimo_notas: int = 2
+    limiar_amarelo: float = 50.0
+    limiar_verde: float = 75.0
+    alerta_queda: float = 20.0
+    alerta_mesma_posicao: int = 3
+
+
+def _carregar_config(cur) -> _ConfigMetricas:
+    cur.execute(
+        """
+        SELECT notas_janela, minimo_notas, limiar_amarelo, limiar_verde, alerta_queda, alerta_mesma_posicao
+        FROM config_metricas WHERE id = 1
+        """
+    )
+    r = cur.fetchone()
+    if not r:
+        return _ConfigMetricas()
+    return _ConfigMetricas(int(r[0]), int(r[1]), float(r[2]), float(r[3]), float(r[4]), int(r[5]))
+
+
+def _status(media: float | None, quantidade: int, cfg: _ConfigMetricas) -> tuple[str, str]:
+    if quantidade == 0:
+        return "CINZA", "Nenhuma atividade concluída ainda."
+    if quantidade < cfg.minimo_notas:
+        faltam = cfg.minimo_notas - quantidade
+        return "CINZA", f"Dados insuficientes: falta{'m' if faltam > 1 else ''} {faltam} atividade{'s' if faltam > 1 else ''} concluída{'s' if faltam > 1 else ''} para definir o status."
+    if media >= cfg.limiar_verde:
+        return "VERDE", "Faz com autonomia; pode avançar."
+    if media >= cfg.limiar_amarelo:
+        return "AMARELO", "Em desenvolvimento; repetir com dicas."
+    return "VERMELHO", "Precisa de mais apoio; voltar uma etapa."
+
+
+def _alertas_fichas_dificeis(cur, aluno_id: str, cfg: _ConfigMetricas) -> list[AlertaPedagógicoResponse]:
+    """Ficha esperada errada em >= alerta_mesma_posicao atividades diferentes."""
+    cur.execute(
+        """
+        WITH erros AS (
+            SELECT fe.simbolo AS esperada, fa_.simbolo AS apresentada, s.atividade_id
+            FROM leitura_ficha lf
+            JOIN tentativa t ON t.id = lf.tentativa_id
+            JOIN execucao_alvo ea ON ea.id = t.execucao_alvo_id
+            JOIN fase_alvo fa ON fa.id = ea.fase_alvo_id
+            JOIN fase_atividade f ON f.id = fa.fase_id
+            JOIN sessao_atividade s ON s.id = ea.sessao_id
+            JOIN ficha fe ON fe.id = lf.ficha_esperada_id
+            JOIN ficha fa_ ON fa_.id = lf.ficha_apresentada_id
+            WHERE s.aluno_id::text = %s AND NOT lf.correta AND f.tipo_fase <> 'EXPLORAR'
+        )
+        SELECT esperada,
+               count(DISTINCT atividade_id) AS atividades,
+               count(*) AS erros,
+               mode() WITHIN GROUP (ORDER BY apresentada) AS troca_mais_comum
+        FROM erros
+        GROUP BY esperada
+        HAVING count(DISTINCT atividade_id) >= %s
+        ORDER BY atividades DESC, erros DESC
+        """,
+        (aluno_id, cfg.alerta_mesma_posicao),
+    )
+    return [
+        AlertaPedagógicoResponse(
+            tipo="FICHA_DIFICIL",
+            titulo=f"Dificuldade recorrente com a ficha {esperada}",
+            mensagem=(
+                f"Errou a ficha {esperada} em {atividades} atividades diferentes ({erros} erros). "
+                f"Troca mais comum: apresentou {troca} no lugar."
+            ),
+        )
+        for esperada, atividades, erros, troca in cur.fetchall()
+    ]
+
+
+def _metricas_aluno(cur, aluno_id: str, aluno_nome: str, turma_nome: str, cfg: _ConfigMetricas) -> MetricasAlunoResponse:
+    cur.execute(
+        """
+        SELECT count(*) FROM sessao_atividade s
+        JOIN avaliacao_sessao av ON av.sessao_id = s.id
+        WHERE s.aluno_id::text = %s AND s.status = 'CONCLUIDA'
+        """,
+        (aluno_id,),
+    )
+    total_concluidas = int(cur.fetchone()[0])
+
+    cur.execute(
+        """
+        SELECT s.id::text, at.titulo, m.nome, s.encerrada_em, av.nota,
+               (SELECT round(100.0 * count(*) FILTER (WHERE lf.correta) / NULLIF(count(*), 0), 1)
+                FROM leitura_ficha lf
+                JOIN tentativa t ON t.id = lf.tentativa_id
+                JOIN execucao_alvo ea ON ea.id = t.execucao_alvo_id
+                JOIN fase_alvo fa ON fa.id = ea.fase_alvo_id
+                JOIN fase_atividade f ON f.id = fa.fase_id
+                WHERE ea.sessao_id = s.id AND f.pontuavel)
+        FROM sessao_atividade s
+        JOIN avaliacao_sessao av ON av.sessao_id = s.id
+        JOIN atividade at ON at.id = s.atividade_id
+        JOIN modulo m ON m.id = at.modulo_id
+        WHERE s.aluno_id::text = %s AND s.status = 'CONCLUIDA'
+        ORDER BY s.encerrada_em DESC, s.id DESC
+        LIMIT %s
+        """,
+        (aluno_id, max(HISTORICO_MAXIMO, cfg.notas_janela)),
+    )
+    historico = [
+        SessaoHistoricoResponse(
+            sessao_id=r[0],
+            atividade_titulo=(r[1] or "").replace("[DEMONSTRACAO]", "").strip(),
+            modulo_nome=r[2],
+            data=r[3].isoformat() if r[3] else "",
+            nota=float(r[4]),
+            percentual_acertos=float(r[5]) if r[5] is not None else None,
+        )
+        for r in cur.fetchall()
+    ]
+
+    ultimas_notas = [h.nota for h in historico[: cfg.notas_janela]]
+    media = round(sum(ultimas_notas) / len(ultimas_notas), 1) if ultimas_notas else None
+    status_colorido, descricao = _status(media, len(ultimas_notas), cfg)
+
+    alertas: list[AlertaPedagógicoResponse] = []
+    if len(ultimas_notas) >= 2 and (ultimas_notas[1] - ultimas_notas[0]) >= cfg.alerta_queda:
+        alertas.append(
+            AlertaPedagógicoResponse(
+                tipo="QUEDA_RECENTE",
+                titulo="Queda recente no desempenho",
+                mensagem=(
+                    f"A última nota ({ultimas_notas[0]:.1f}) caiu {ultimas_notas[1] - ultimas_notas[0]:.1f} pontos "
+                    f"em relação à anterior ({ultimas_notas[1]:.1f})."
+                ),
+            )
+        )
+    if len(ultimas_notas) >= 3 and ultimas_notas[0] > ultimas_notas[1] > ultimas_notas[2]:
+        alertas.append(
+            AlertaPedagógicoResponse(
+                tipo="EVOLUCAO",
+                titulo="Evolução contínua",
+                mensagem="As 3 últimas notas foram crescentes.",
+            )
+        )
+    alertas.extend(_alertas_fichas_dificeis(cur, aluno_id, cfg))
+
+    return MetricasAlunoResponse(
+        aluno_id=aluno_id,
+        aluno_nome=aluno_nome,
+        turma_nome=turma_nome,
+        status_colorido=status_colorido,
+        descricao_status=descricao,
+        media_notas=media,
+        total_sessoes_concluidas=total_concluidas,
+        ultimas_notas=ultimas_notas,
+        historico=historico,
+        notas_janela=cfg.notas_janela,
+        minimo_notas=cfg.minimo_notas,
+        alertas=alertas,
+    )
+
+
+def _erro_banco(e: Exception) -> HTTPException:
+    logger.exception("Falha ao calcular métricas: %s", e)
+    return HTTPException(
+        status_code=503,
+        detail="Não foi possível calcular as métricas: banco de dados indisponível.",
+    )
 
 
 def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoResponse:
-    """
-    Calcula as métricas pedagógicas, status colorido e alertas de um aluno (RF-031, RF-032).
-    Calcula a nota real e atualiza a cada atividade concluída ou parcial.
-    """
+    """Status colorido, histórico e alertas de um aluno (RF-031, RF-032)."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Buscar nome do aluno e sua turma atual
                 cur.execute(
                     """
-                    SELECT a.nome || ' ' || a.sobrenome as aluno_nome, t.nome as turma_nome
+                    SELECT a.nome || ' ' || a.sobrenome, t.nome
                     FROM aluno a
                     JOIN turma t ON a.turma_atual_id = t.id
                     WHERE a.id::text = %s AND t.professor_id::text = %s
@@ -30,171 +207,19 @@ def calcular_metricas_aluno(professor_id: str, aluno_id: str) -> MetricasAlunoRe
                 aluno_row = cur.fetchone()
                 if not aluno_row:
                     raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-
-                aluno_nome, turma_nome = aluno_row[0], aluno_row[1]
-
-                # 2. Buscar as notas reais salvas ou calcular a taxa real de acertos das fichas (RF-031)
-                cur.execute(
-                    """
-                    SELECT s.id, s.iniciada_em::text,
-                           COALESCE(
-                               av.nota,
-                               (
-                                   SELECT ROUND((COUNT(*) FILTER (WHERE correta = TRUE)::numeric / NULLIF(COUNT(*), 0)) * 100, 1)
-                                   FROM leitura_ficha lf
-                                   JOIN tentativa t ON lf.tentativa_id = t.id
-                                   JOIN execucao_alvo ea ON t.execucao_alvo_id = ea.id
-                                   WHERE ea.sessao_id = s.id
-                               ),
-                               80.0
-                           ) as nota
-                    FROM sessao_atividade s
-                    LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
-                    WHERE s.aluno_id::text = %s AND s.status IN ('CONCLUIDA', 'PARCIAL')
-                    ORDER BY s.iniciada_em DESC
-                    LIMIT 3
-                    """,
-                    (aluno_id,),
-                )
-                sessoes_rows = cur.fetchall()
-
-                # Se não encontrou sessões com status CONCLUIDA/PARCIAL, buscar qualquer sessão do aluno
-                if not sessoes_rows:
-                    cur.execute(
-                        """
-                        SELECT s.id, s.iniciada_em::text,
-                               COALESCE(
-                                   av.nota,
-                                   (
-                                       SELECT ROUND((COUNT(*) FILTER (WHERE correta = TRUE)::numeric / NULLIF(COUNT(*), 0)) * 100, 1)
-                                       FROM leitura_ficha lf
-                                       JOIN tentativa t ON lf.tentativa_id = t.id
-                                       JOIN execucao_alvo ea ON t.execucao_alvo_id = ea.id
-                                       WHERE ea.sessao_id = s.id
-                                   ),
-                                   80.0
-                               ) as nota
-                        FROM sessao_atividade s
-                        LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id
-                        WHERE s.aluno_id::text = %s
-                        ORDER BY s.iniciada_em DESC
-                        LIMIT 3
-                        """,
-                        (aluno_id,),
-                    )
-                    sessoes_rows = cur.fetchall()
-
-                ultimas_notas = [float(r[2]) for r in sessoes_rows]
-                total_concluidas = len(ultimas_notas)
-
-                # 3. Regra RF-031: Status Colorido atualizado desde a 1ª atividade
-                if total_concluidas == 0:
-                    status_colorido = "CINZA"
-                    descricao_status = "Nenhuma atividade concluída ainda."
-                    media_notas = None
-                else:
-                    media_notas = round(sum(ultimas_notas) / total_concluidas, 1)
-                    if media_notas >= 75.0:
-                        status_colorido = "VERDE"
-                        descricao_status = "Faz com autonomia; pode avançar."
-                    elif media_notas >= 50.0:
-                        status_colorido = "AMARELO"
-                        descricao_status = "Em desenvolvimento; repetir com dicas."
-                    else:
-                        status_colorido = "VERMELHO"
-                        descricao_status = "Precisa de mais apoio; voltar uma etapa."
-
-                # 4. Regra RF-032: Alertas Pedagógicos
-                alertas = []
-                if len(ultimas_notas) >= 2:
-                    nota_atual = ultimas_notas[0]
-                    nota_anterior = ultimas_notas[1]
-                    if (nota_anterior - nota_atual) >= 20.0:
-                        alertas.append(
-                            AlertaPedagógicoResponse(
-                                tipo="QUEDA_RECENTE",
-                                titulo="Queda Recente no Desempenho",
-                                mensagem=f"A última nota ({nota_atual:.1f}) caiu mais de 20 pontos em relação à anterior ({nota_anterior:.1f}).",
-                            )
-                        )
-
-                if len(ultimas_notas) == 3:
-                    if ultimas_notas[0] > ultimas_notas[1] and ultimas_notas[1] > ultimas_notas[2]:
-                        alertas.append(
-                            AlertaPedagógicoResponse(
-                                tipo="EVOLUCAO",
-                                titulo="Evolução Contínua em Crescimento",
-                                mensagem="O aluno apresenta crescimento consecutivo nas 3 últimas atividades!",
-                            )
-                        )
-
-                return MetricasAlunoResponse(
-                    aluno_id=aluno_id,
-                    aluno_nome=aluno_nome,
-                    turma_nome=turma_nome,
-                    status_colorido=status_colorido,
-                    descricao_status=descricao_status,
-                    media_notas=media_notas,
-                    total_sessoes_concluidas=total_concluidas,
-                    ultimas_notas=ultimas_notas,
-                    alertas=alertas,
-                )
-
+                cfg = _carregar_config(cur)
+                return _metricas_aluno(cur, aluno_id, aluno_row[0], aluno_row[1], cfg)
     except HTTPException:
         raise
-    except Exception:
-        # Fallback dinâmico em memória para ambiente de dev/sem PostgreSQL
-        notas_mem = []
-        for s in _IN_MEMORY_SESSOES.values():
-            if str(s.get("aluno_id")) == str(aluno_id):
-                n = s.get("nota")
-                if n is not None:
-                    notas_mem.append(float(n))
-
-        if notas_mem:
-            total_c = len(notas_mem)
-            media_m = round(sum(notas_mem) / total_c, 1)
-            st_color = "VERDE" if media_m >= 75.0 else ("AMARELO" if media_m >= 50.0 else "VERMELHO")
-            desc_m = "Faz com autonomia; pode avançar." if st_color == "VERDE" else "Em desenvolvimento."
-            return MetricasAlunoResponse(
-                aluno_id=aluno_id,
-                aluno_nome="Aluno DTAE",
-                turma_nome="Turma DTAE",
-                status_colorido=st_color,
-                descricao_status=desc_m,
-                media_notas=media_m,
-                total_sessoes_concluidas=total_c,
-                ultimas_notas=notas_mem[-3:],
-                alertas=[
-                    AlertaPedagógicoResponse(
-                        tipo="EVOLUCAO",
-                        titulo="Atividade Concluída com Sucesso",
-                        mensagem=f"Última nota registrada: {notas_mem[-1]:.1f} pts.",
-                    )
-                ],
-            )
-
-        return MetricasAlunoResponse(
-            aluno_id=aluno_id,
-            aluno_nome="Aluno DTAE",
-            turma_nome="Turma DTAE",
-            status_colorido="CINZA",
-            descricao_status="Nenhuma atividade concluída ainda.",
-            media_notas=None,
-            total_sessoes_concluidas=0,
-            ultimas_notas=[],
-            alertas=[],
-        )
+    except Exception as e:
+        raise _erro_banco(e)
 
 
 def calcular_metricas_turma(professor_id: str, turma_id: str) -> MetricasTurmaResponse:
-    """
-    Calcula o relatório coletivo da turma e a distribuição de alunos por status colorido (RF-033).
-    """
+    """Relatório coletivo da turma e distribuição por status colorido (RF-033)."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Obter nome da turma
                 cur.execute(
                     "SELECT nome FROM turma WHERE id::text = %s AND professor_id::text = %s",
                     (turma_id, professor_id),
@@ -202,56 +227,40 @@ def calcular_metricas_turma(professor_id: str, turma_id: str) -> MetricasTurmaRe
                 turma_row = cur.fetchone()
                 if not turma_row:
                     raise HTTPException(status_code=404, detail="Turma não encontrada.")
-
                 turma_nome = turma_row[0]
+                cfg = _carregar_config(cur)
 
-                # 2. Obter alunos da turma
                 cur.execute(
-                    "SELECT id FROM aluno WHERE turma_atual_id::text = %s AND arquivado_em IS NULL",
+                    """
+                    SELECT id::text, nome || ' ' || sobrenome FROM aluno
+                    WHERE turma_atual_id::text = %s AND arquivado_em IS NULL
+                    ORDER BY nome, sobrenome
+                    """,
                     (turma_id,),
                 )
-                alunos_rows = cur.fetchall()
+                alunos = cur.fetchall()
+                metricas_alunos = [_metricas_aluno(cur, a_id, nome, turma_nome, cfg) for a_id, nome in alunos]
 
-                metricas_alunos = []
-                verdes = amarelo = vermelho = cinza = 0
+        contagem = {"VERDE": 0, "AMARELO": 0, "VERMELHO": 0, "CINZA": 0}
+        for m in metricas_alunos:
+            contagem[m.status_colorido] = contagem.get(m.status_colorido, 0) + 1
 
-                for a_row in alunos_rows:
-                    m = calcular_metricas_aluno(professor_id, str(a_row[0]))
-                    metricas_alunos.append(m)
+        # Média da turma só com alunos que já têm status definido (não cinza)
+        medias = [m.media_notas for m in metricas_alunos if m.status_colorido != "CINZA" and m.media_notas is not None]
+        media_turma = round(sum(medias) / len(medias), 1) if medias else None
 
-                    if m.status_colorido == "VERDE": verdes += 1
-                    elif m.status_colorido == "AMARELO": amarelo += 1
-                    elif m.status_colorido == "VERMELHO": vermelho += 1
-                    else: cinza += 1
-
-                total_alunos = len(metricas_alunos)
-                medias_validas = [m.media_notas for m in metricas_alunos if m.media_notas is not None]
-                media_turma = sum(medias_validas) / len(medias_validas) if medias_validas else None
-
-                return MetricasTurmaResponse(
-                    turma_id=turma_id,
-                    turma_nome=turma_nome,
-                    total_alunos=total_alunos,
-                    media_turma=media_turma,
-                    alunos_verde=verdes,
-                    alunos_amarelo=amarelo,
-                    alunos_vermelho=vermelho,
-                    alunos_cinza=cinza,
-                    alunos_metricas=metricas_alunos,
-                )
-
-    except HTTPException:
-        raise
-    except Exception:
-        # Fallback dev mode
         return MetricasTurmaResponse(
             turma_id=turma_id,
-            turma_nome="Turma DTAE",
-            total_alunos=4,
-            media_turma=82.0,
-            alunos_verde=2,
-            alunos_amarelo=1,
-            alunos_vermelho=0,
-            alunos_cinza=1,
-            alunos_metricas=[],
+            turma_nome=turma_nome,
+            total_alunos=len(metricas_alunos),
+            media_turma=media_turma,
+            alunos_verde=contagem["VERDE"],
+            alunos_amarelo=contagem["AMARELO"],
+            alunos_vermelho=contagem["VERMELHO"],
+            alunos_cinza=contagem["CINZA"],
+            alunos_metricas=metricas_alunos,
         )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _erro_banco(e)
