@@ -1,4 +1,6 @@
 import uuid
+import re
+import logging
 import datetime
 from typing import Optional
 from fastapi import HTTPException, status
@@ -11,29 +13,55 @@ from ..schemas.sessao_schema import (
     AlertaAtividadeResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 # In-memory storage for dev mode fallback
 _IN_MEMORY_SESSOES = {}
 
+# Separadores que aparecem em rótulos de alvo (ex: "MA-LA") mas não existem
+# como ficha física no PAD. Mesma regra é aplicada no app.
+_SEPARADORES_ROTULO = re.compile(r"[\s\-–—_.]")
+
+
+def _normalizar_rotulo(rotulo: str) -> str:
+    """Rótulo como sequência de fichas: sem separadores e em maiúsculas."""
+    return _SEPARADORES_ROTULO.sub("", rotulo or "").upper()
+
 
 def obter_alvos_da_atividade(cur, atividade_id: str, categoria: str) -> list[str]:
-    """Busca dinamicamente os rótulos de alvos cadastrados para a atividade no PostgreSQL."""
+    """Retorna os alvos da fase ordenada da atividade, na ordem pedagógica cadastrada.
+
+    O app executa uma fase em ordem e depois a mesma lista embaralhada, então a
+    lista vem da fase ORDEM (ou FORMACAO, no módulo de palavras), respeitando
+    fase_alvo.ordem_padrao. Fases de outro tipo (ex: COMPARACAO) não são misturadas.
+    """
     try:
         cur.execute(
             """
-            SELECT DISTINCT a.rotulo
-            FROM fase_atividade fa
-            JOIN fase_alvo f_alvo ON f_alvo.fase_id = fa.id
+            SELECT a.rotulo
+            FROM fase_alvo f_alvo
             JOIN alvo a ON f_alvo.alvo_id = a.id
-            WHERE fa.atividade_id::text = %s
-            ORDER BY a.rotulo ASC
+            WHERE f_alvo.fase_id = (
+                SELECT f.id
+                FROM fase_atividade f
+                WHERE f.atividade_id::text = %s
+                  AND EXISTS (SELECT 1 FROM fase_alvo x WHERE x.fase_id = f.id)
+                ORDER BY (f.tipo_fase IN ('ORDEM', 'FORMACAO')) DESC,
+                         f.pontuavel DESC,
+                         f.ordem ASC
+                LIMIT 1
+            )
+            ORDER BY f_alvo.ordem_padrao ASC
             """,
             (atividade_id,),
         )
         rows = cur.fetchall()
-        if rows:
-            return [r[0] for r in rows]
+        alvos = [_normalizar_rotulo(r[0]) for r in rows]
+        alvos = [a for a in alvos if a]
+        if alvos:
+            return alvos
     except Exception:
-        pass
+        logger.exception("Falha ao buscar alvos da atividade %s", atividade_id)
 
     if categoria == 'SILABAS':
         return ['MA', 'ME', 'MI', 'MO', 'MU', 'LA', 'LE', 'LI', 'LO', 'LU']
@@ -255,104 +283,236 @@ def obter_sessao_ativa(professor_id: str) -> Optional[SessaoResponse]:
         return None
 
 
+def _resolver_fase_alvo(cur, sessao_id: str, alvo_ref: str, tipo_fase: Optional[str]):
+    """Encontra o fase_alvo da sessão correspondente ao alvo informado pelo app.
+
+    O app envia o alvo como UUID ou como "alvo_<rotulo>". Quando o mesmo alvo
+    existe em várias fases (ex: vogais em ORDEM e EMBARALHADA), usa a fase
+    informada em tipo_fase. Leituras do tutorial (EXPLORAR) só são gravadas se
+    a atividade tiver fase EXPLORAR, para não contaminar fases pontuáveis.
+    Retorna (fase_alvo_id, alvo_id) ou None.
+    """
+    ref = (alvo_ref or "").strip()
+    rotulo = _normalizar_rotulo(ref[5:] if ref.lower().startswith("alvo_") else ref)
+    tipo = (tipo_fase or "").strip().upper()
+
+    cur.execute(
+        """
+        SELECT fa.id::text, a.id::text, f.tipo_fase
+        FROM sessao_atividade s
+        JOIN fase_atividade f ON f.atividade_id = s.atividade_id
+        JOIN fase_alvo fa ON fa.fase_id = f.id
+        JOIN alvo a ON a.id = fa.alvo_id
+        WHERE s.id::text = %s
+          AND (a.id::text = %s
+               OR upper(regexp_replace(a.rotulo, '[[:space:]_.–—-]', '', 'g')) = %s)
+        ORDER BY (f.tipo_fase = %s) DESC,
+                 (f.tipo_fase IN ('ORDEM', 'FORMACAO')) DESC,
+                 f.ordem ASC
+        """,
+        (sessao_id, ref, rotulo, tipo),
+    )
+    rows = cur.fetchall()
+    if not rows:
+        return None
+
+    if tipo == "EXPLORAR":
+        row = next((r for r in rows if r[2] == "EXPLORAR"), None)
+    else:
+        row = next((r for r in rows if r[2] != "EXPLORAR"), None)
+    return (row[0], row[1]) if row else None
+
+
+def _obter_ou_criar_ficha(cur, simbolo: str) -> Optional[str]:
+    """Busca a ficha pelo símbolo. Fichas físicas ainda não catalogadas (ex: números
+    enviados pelo PAD) são cadastradas como OUTRA para o erro não se perder."""
+    if not simbolo:
+        return None
+    cur.execute("SELECT id::text FROM ficha WHERE upper(simbolo) = %s LIMIT 1", (simbolo,))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+    if not re.fullmatch(r"[0-9A-Z]{1,2}", simbolo):
+        return None
+    cur.execute(
+        """
+        INSERT INTO ficha (simbolo, tipo) VALUES (%s, 'OUTRA')
+        ON CONFLICT (simbolo) DO UPDATE SET simbolo = EXCLUDED.simbolo
+        RETURNING id::text
+        """,
+        (simbolo,),
+    )
+    return cur.fetchone()[0]
+
+
 def registrar_leitura_ficha(
     professor_id: str, sessao_id: str, request: LeituraFichaRequest
 ) -> dict:
-    """Registra um evento de leitura de ficha (RF-023) no PostgreSQL sem sobrescrever histórico."""
+    """Registra uma leitura de ficha (RF-023) preservando o histórico de tentativas.
+
+    Modelo gravado:
+      execucao_alvo (1 por alvo da fase na sessão)
+        └─ tentativa (numerada; fica EM_ANDAMENTO até errar ou completar o alvo)
+             └─ leitura_ficha (posição da ficha dentro do alvo, esperada x apresentada)
+    Um erro encerra a tentativa como ERRO; a próxima leitura abre uma nova tentativa.
+    Completar a última posição encerra a tentativa como ACERTO e conclui o alvo.
+    """
     leitura_id = str(uuid.uuid4())
+    simbolo = request.ficha_codigo.replace("FICHA_", "").replace("VOGAL_", "").strip().upper()
+    base_resposta = {
+        "leitura_id": leitura_id,
+        "sessao_id": sessao_id,
+        "alvo_id": request.alvo_id,
+        "posicao": request.posicao,
+        "ficha_codigo": request.ficha_codigo,
+    }
 
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id FROM sessao_atividade WHERE id::text = %s AND professor_id::text = %s AND status = 'EM_ANDAMENTO'",
+                    """
+                    SELECT modo_registro FROM sessao_atividade
+                    WHERE id::text = %s AND professor_id::text = %s AND status = 'EM_ANDAMENTO'
+                    """,
                     (sessao_id, professor_id),
                 )
-                if not cur.fetchone():
+                sessao_row = cur.fetchone()
+                if not sessao_row:
                     raise HTTPException(
                         status_code=404, detail="Sessão ativa em andamento não encontrada."
                     )
+                origem = sessao_row[0] if sessao_row[0] in ("MANUAL", "SIMULACAO", "PAD") else "MANUAL"
 
-                symbol = request.ficha_codigo.replace("FICHA_", "").replace("VOGAL_", "").strip()
-
-                cur.execute("SELECT id FROM ficha WHERE simbolo = %s LIMIT 1", (symbol,))
-                ficha_row = cur.fetchone()
-                ficha_id = str(ficha_row[0]) if ficha_row else None
-
-                if not ficha_id:
-                    cur.execute("SELECT id FROM ficha LIMIT 1")
-                    f_default = cur.fetchone()
-                    ficha_id = str(f_default[0]) if f_default else None
+                resolvido = _resolver_fase_alvo(cur, sessao_id, request.alvo_id, request.tipo_fase)
+                if not resolvido:
+                    logger.warning(
+                        "Leitura não gravada: alvo %s (fase %s) não pertence à sessão %s",
+                        request.alvo_id, request.tipo_fase, sessao_id,
+                    )
+                    return {**base_resposta, "correta": request.correta, "registrada": False,
+                            "mensagem": "Alvo não pertence a esta atividade; leitura não gravada."}
+                fase_alvo_id, alvo_id = resolvido
 
                 cur.execute(
                     """
-                    SELECT fa.id
-                    FROM sessao_atividade s
-                    JOIN fase_atividade f ON f.atividade_id = s.atividade_id
-                    JOIN fase_alvo fa ON fa.fase_id = f.id
-                    WHERE s.id::text = %s
-                    LIMIT 1
+                    SELECT af.ficha_id::text,
+                           (SELECT count(*) FROM alvo_ficha WHERE alvo_id = %s::uuid)
+                    FROM alvo_ficha af
+                    WHERE af.alvo_id = %s::uuid AND af.posicao = %s
                     """,
-                    (sessao_id,),
+                    (alvo_id, alvo_id, request.posicao),
                 )
-                fa_row = cur.fetchone()
-                fa_id = str(fa_row[0]) if fa_row else None
+                esperada_row = cur.fetchone()
+                ficha_apresentada_id = _obter_ou_criar_ficha(cur, simbolo)
+                if not esperada_row or not ficha_apresentada_id:
+                    logger.warning(
+                        "Leitura não gravada: posição %s / ficha %s inválidas para o alvo %s",
+                        request.posicao, simbolo, request.alvo_id,
+                    )
+                    conn.rollback()
+                    return {**base_resposta, "correta": request.correta, "registrada": False,
+                            "mensagem": "Posição ou ficha inválida para o alvo; leitura não gravada."}
+                ficha_esperada_id, total_posicoes = esperada_row[0], int(esperada_row[1])
 
-                if fa_id and ficha_id:
-                    ea_id = str(uuid.uuid4())
+                # A correção é decidida pelo gabarito do banco (exigido pelo CHECK da tabela).
+                correta = ficha_esperada_id == ficha_apresentada_id
+                if correta != request.correta:
+                    logger.warning(
+                        "Divergência app x gabarito na sessão %s: alvo %s pos %s ficha %s (app=%s, banco=%s)",
+                        sessao_id, request.alvo_id, request.posicao, simbolo, request.correta, correta,
+                    )
+
+                # 1. Execução do alvo (ordem_real é sequencial dentro da sessão)
+                cur.execute(
+                    """
+                    SELECT id::text FROM execucao_alvo
+                    WHERE sessao_id::text = %s AND fase_alvo_id = %s::uuid
+                    """,
+                    (sessao_id, fase_alvo_id),
+                )
+                ea_row = cur.fetchone()
+                if ea_row:
+                    execucao_id = ea_row[0]
+                else:
                     cur.execute(
                         """
-                        INSERT INTO execucao_alvo (id, sessao_id, fase_alvo_id, ordem_real, status)
-                        VALUES (%s::uuid, %s::uuid, %s::uuid, 1, 'EM_ANDAMENTO')
-                        ON CONFLICT (sessao_id, fase_alvo_id) DO UPDATE SET status = 'EM_ANDAMENTO'
+                        INSERT INTO execucao_alvo (sessao_id, fase_alvo_id, ordem_real, status, iniciada_em)
+                        SELECT %s::uuid, %s::uuid, COALESCE(MAX(ordem_real), 0) + 1, 'EM_ANDAMENTO', now()
+                        FROM execucao_alvo WHERE sessao_id = %s::uuid
                         RETURNING id::text
                         """,
-                        (ea_id, sessao_id, fa_id),
+                        (sessao_id, fase_alvo_id, sessao_id),
                     )
-                    ea_real_id = cur.fetchone()[0]
+                    execucao_id = cur.fetchone()[0]
 
-                    res_str = 'ACERTO' if request.correta else 'ERRO'
-                    tent_id = str(uuid.uuid4())
+                # 2. Tentativa aberta (ou uma nova, se a anterior terminou)
+                cur.execute(
+                    """
+                    SELECT id::text FROM tentativa
+                    WHERE execucao_alvo_id = %s::uuid AND resultado = 'EM_ANDAMENTO'
+                    ORDER BY numero DESC LIMIT 1
+                    """,
+                    (execucao_id,),
+                )
+                tent_row = cur.fetchone()
+                if tent_row:
+                    tentativa_id = tent_row[0]
+                else:
                     cur.execute(
                         """
-                        INSERT INTO tentativa (id, execucao_alvo_id, numero, resultado, iniciada_em, encerrada_em)
-                        VALUES (%s::uuid, %s::uuid, %s, %s, now(), now())
-                        ON CONFLICT (execucao_alvo_id, numero) DO UPDATE SET 
-                            resultado = EXCLUDED.resultado,
-                            encerrada_em = now()
+                        INSERT INTO tentativa (execucao_alvo_id, numero, resultado, iniciada_em)
+                        SELECT %s::uuid, COALESCE(MAX(numero), 0) + 1, 'EM_ANDAMENTO', now()
+                        FROM tentativa WHERE execucao_alvo_id = %s::uuid
                         RETURNING id::text
                         """,
-                        (tent_id, ea_real_id, max(request.posicao, 1), res_str),
+                        (execucao_id, execucao_id),
                     )
-                    tent_real_id = cur.fetchone()[0]
+                    tentativa_id = cur.fetchone()[0]
 
+                # 3. Leitura na posição da ficha dentro do alvo (reenvio duplicado é ignorado)
+                cur.execute(
+                    """
+                    INSERT INTO leitura_ficha (id, tentativa_id, posicao, ficha_esperada_id,
+                                               ficha_apresentada_id, correta, origem_registro)
+                    VALUES (%s::uuid, %s::uuid, %s, %s::uuid, %s::uuid, %s, %s)
+                    ON CONFLICT (tentativa_id, posicao) DO NOTHING
+                    """,
+                    (leitura_id, tentativa_id, request.posicao, ficha_esperada_id,
+                     ficha_apresentada_id, correta, origem),
+                )
+
+                # 4. Fecha a tentativa / conclui o alvo
+                if not correta:
                     cur.execute(
-                        "SELECT COALESCE(MAX(posicao), 0) + 1 FROM leitura_ficha WHERE tentativa_id::text = %s",
-                        (tent_real_id,),
+                        "UPDATE tentativa SET resultado = 'ERRO', encerrada_em = now() WHERE id = %s::uuid",
+                        (tentativa_id,),
                     )
-                    next_pos = cur.fetchone()[0]
-
+                elif request.posicao >= total_posicoes:
+                    cur.execute(
+                        "UPDATE tentativa SET resultado = 'ACERTO', encerrada_em = now() WHERE id = %s::uuid",
+                        (tentativa_id,),
+                    )
                     cur.execute(
                         """
-                        INSERT INTO leitura_ficha (id, tentativa_id, posicao, ficha_esperada_id, ficha_apresentada_id, correta, origem_registro)
-                        VALUES (%s::uuid, %s::uuid, %s, %s::uuid, %s::uuid, %s, 'MANUAL')
+                        UPDATE execucao_alvo
+                        SET status = 'CONCLUIDO', concluida_em = COALESCE(concluida_em, now())
+                        WHERE id = %s::uuid
                         """,
-                        (leitura_id, tent_real_id, next_pos, ficha_id, ficha_id, request.correta),
+                        (execucao_id,),
                     )
 
                 conn.commit()
                 return {
-                    "leitura_id": leitura_id,
-                    "sessao_id": sessao_id,
-                    "alvo_id": request.alvo_id,
-                    "posicao": request.posicao,
-                    "ficha_codigo": request.ficha_codigo,
-                    "correta": request.correta,
-                    "mensagem": "Leitura gravada" if request.correta else "Erro registrado.",
+                    **base_resposta,
+                    "correta": correta,
+                    "registrada": True,
+                    "mensagem": "Leitura gravada" if correta else "Erro registrado.",
                 }
     except HTTPException:
         raise
     except Exception:
+        logger.exception("Falha ao gravar leitura no banco; usando armazenamento em memória")
         if sessao_id in _IN_MEMORY_SESSOES:
             s = _IN_MEMORY_SESSOES[sessao_id]
             if "leituras" not in s:
@@ -360,10 +520,10 @@ def registrar_leitura_ficha(
             s["leituras"].append({"correta": request.correta, "ficha_codigo": request.ficha_codigo})
             s["total_tentativas"] = len(s["leituras"])
         return {
-            "leitura_id": leitura_id,
-            "sessao_id": sessao_id,
+            **base_resposta,
             "correta": request.correta,
-            "mensagem": "Leitura registrada.",
+            "registrada": False,
+            "mensagem": "Leitura registrada apenas em memória.",
         }
 
 
@@ -430,18 +590,21 @@ def finalizar_sessao(
                         (atividade_id,),
                     )
                     fa_rows = cur.fetchall()
-                    for idx, fa_r in enumerate(fa_rows):
+                    for fa_r in fa_rows:
                         fa_id = str(fa_r[0])
+                        # ordem_real é única por sessão: alvos já executados mantêm a
+                        # ordem em que aconteceram e os restantes entram ao final.
                         cur.execute(
                             """
-                            INSERT INTO execucao_alvo (id, sessao_id, fase_alvo_id, ordem_real, status, iniciada_em, concluida_em)
-                            VALUES (gen_random_uuid(), %s::uuid, %s::uuid, %s, 'CONCLUIDO', now(), now())
+                            INSERT INTO execucao_alvo (sessao_id, fase_alvo_id, ordem_real, status, iniciada_em, concluida_em)
+                            SELECT %s::uuid, %s::uuid, COALESCE(MAX(ordem_real), 0) + 1, 'CONCLUIDO', now(), now()
+                            FROM execucao_alvo WHERE sessao_id = %s::uuid
                             ON CONFLICT (sessao_id, fase_alvo_id) DO UPDATE SET
                                 status = 'CONCLUIDO',
                                 iniciada_em = COALESCE(execucao_alvo.iniciada_em, now()),
-                                concluida_em = now()
+                                concluida_em = COALESCE(execucao_alvo.concluida_em, now())
                             """,
-                            (sessao_id, fa_id, idx + 1),
+                            (sessao_id, fa_id, sessao_id),
                         )
 
                     # 2. Atualizar a sessao para status 'CONCLUIDA'

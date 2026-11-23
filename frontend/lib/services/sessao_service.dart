@@ -84,6 +84,7 @@ class SessaoService {
     required int posicao,
     required String fichaCodigo,
     required bool correta,
+    String? tipoFase,
   }) async {
     try {
       final response = await http
@@ -95,6 +96,7 @@ class SessaoService {
               'posicao': posicao,
               'ficha_codigo': fichaCodigo,
               'correta': correta,
+              if (tipoFase != null) 'tipo_fase': tipoFase,
             }),
           )
           .timeout(const Duration(seconds: 5));

@@ -50,8 +50,16 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
     final String catApi = (widget.sessao['modulo_categoria'] ?? '').toString().toUpperCase();
     final atvId = (widget.sessao['atividade_id'] ?? '').toString().toLowerCase();
 
-    if (alvosDaApi != null && alvosDaApi.isNotEmpty) {
-      _alvosAtividade = alvosDaApi.map((e) => e.toString()).toList();
+    // Separadores (ex: "MA-LA") não existem como ficha física no PAD; sem essa
+    // limpeza o alvo nunca poderia ser completado. Mesma regra do backend.
+    final separadores = RegExp(r'[\s\-–—_.]');
+    final alvosNormalizados = (alvosDaApi ?? const [])
+        .map((e) => e.toString().replaceAll(separadores, '').toUpperCase())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (alvosNormalizados.isNotEmpty) {
+      _alvosAtividade = alvosNormalizados;
     } else if (catApi == 'SILABAS' || atvId.contains('mod2') || atvId.contains('silaba')) {
       _alvosAtividade = ['MA', 'ME', 'MI', 'MO', 'MU', 'LA', 'LE', 'LI', 'LO', 'LU'];
     } else if (catApi == 'PALAVRAS' || atvId.contains('mod3') || atvId.contains('palavra')) {
@@ -125,24 +133,61 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
     return Colors.red.shade600;
   }
 
-  void _registrarResposta(String fichaTocada) async {
+  // Fila que envia as leituras ao backend na ordem em que aconteceram,
+  // sem bloquear a interação da criança enquanto a rede responde.
+  Future<void> _filaEnvioLeituras = Future.value();
+
+  void _enviarLeitura({
+    required String alvoSolicitado,
+    required int posicao,
+    required String ficha,
+    required bool correta,
+  }) {
+    final sessaoId = widget.sessao['id'];
+    final tipoFase = switch (_etapaAtual) {
+      EtapaAtividade.tutorial => 'EXPLORAR',
+      EtapaAtividade.fase02Randomizada => 'EMBARALHADA',
+      _ => 'ORDEM',
+    };
+    _filaEnvioLeituras = _filaEnvioLeituras.then((_) async {
+      await SessaoService.registrarLeituraFicha(
+        sessaoId,
+        alvoId: 'alvo_${alvoSolicitado.toLowerCase()}',
+        posicao: posicao,
+        fichaCodigo: 'FICHA_$ficha',
+        correta: correta,
+        tipoFase: tipoFase,
+      );
+    }).catchError((Object e) {
+      debugPrint('[LEITURA] Falha ao enviar leitura: $e');
+    });
+  }
+
+  void _registrarResposta(String fichaTocada) {
     if (_etapaAtual == EtapaAtividade.conclusaoFase01) return;
 
     List<String> listaAtual = (_etapaAtual == EtapaAtividade.fase02Randomizada)
         ? _alvosRandomizados
         : _alvosAtividade;
+    if (_alvoIndex >= listaAtual.length) return;
 
     String alvoSolicitado = listaAtual[_alvoIndex];
     String fichaLimpa = fichaTocada.trim().toUpperCase();
     String alvoLimpo = alvoSolicitado.trim().toUpperCase();
+    final bool alvoComposto = alvoLimpo.length > 1;
 
-    // Se o alvo for palavra/sílaba composta (ex: MALA) e for apresentada uma única ficha (ex: M):
-    String letraEsperada = (alvoLimpo.length > 1 && _letraPosicaoNoAlvo < alvoLimpo.length)
-        ? alvoLimpo[_letraPosicaoNoAlvo]
-        : alvoLimpo;
+    // Posição (1-based) da ficha esperada dentro do alvo, capturada ANTES de
+    // qualquer mudança de estado. Assim acerto e erro na mesma letra sempre
+    // são registrados na mesma posição (ex: 2ª letra de MALA = posição 2).
+    final int indiceEsperado = alvoComposto
+        ? _letraPosicaoNoAlvo.clamp(0, alvoLimpo.length - 1)
+        : 0;
+    final int posicaoEsperada = indiceEsperado + 1;
+    final String letraEsperada = alvoComposto ? alvoLimpo[indiceEsperado] : alvoLimpo;
 
     bool isCorreta;
     bool alvoCompletado = false;
+    bool letraParcialCorreta = false;
 
     if (_etapaAtual == EtapaAtividade.tutorial) {
       isCorreta = _alvosAtividade.contains(fichaLimpa) || alvoLimpo.contains(fichaLimpa);
@@ -154,27 +199,26 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
     } else if (fichaLimpa == letraEsperada) {
       // Leitura correta da ficha na posição sequencial da palavra/sílaba
       isCorreta = true;
-      _letrasJaCompletadas.add(fichaLimpa);
-      _letraPosicaoNoAlvo++;
-      if (_letraPosicaoNoAlvo >= alvoLimpo.length) {
-        alvoCompletado = true;
-      }
+      letraParcialCorreta = true;
+      alvoCompletado = posicaoEsperada >= alvoLimpo.length;
     } else {
       isCorreta = false;
-      alvoCompletado = false;
     }
 
-    await SessaoService.registrarLeituraFicha(
-      widget.sessao['id'],
-      alvoId: 'alvo_${alvoSolicitado.toLowerCase()}',
-      posicao: _letraPosicaoNoAlvo > 0 ? _letraPosicaoNoAlvo : (_tentativasNoAlvoAtual + 1),
-      fichaCodigo: 'FICHA_$fichaLimpa',
+    _enviarLeitura(
+      alvoSolicitado: alvoSolicitado,
+      posicao: posicaoEsperada,
+      ficha: fichaLimpa,
       correta: isCorreta,
     );
 
     if (!mounted) return;
 
     setState(() {
+      if (letraParcialCorreta) {
+        _letrasJaCompletadas.add(fichaLimpa);
+        _letraPosicaoNoAlvo = posicaoEsperada;
+      }
       if (_etapaAtual == EtapaAtividade.tutorial) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

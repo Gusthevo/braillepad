@@ -10,9 +10,13 @@ class SessaoIniciarRequest(BaseModel):
 
 class LeituraFichaRequest(BaseModel):
     alvo_id: str = Field(..., example="uuid-do-alvo")
-    posicao: int = Field(default=1, ge=1, example=1)
+    posicao: int = Field(default=1, ge=1, example=1, description="Posição (1-based) da ficha dentro do alvo")
     ficha_codigo: str = Field(..., example="VOGAL_A")
     correta: bool = Field(default=True, example=True)
+    tipo_fase: str | None = Field(
+        default=None, example="ORDEM",
+        description="Fase em que a leitura ocorreu: EXPLORAR, ORDEM, EMBARALHADA, COMPARACAO ou FORMACAO",
+    )
 
 
 class SessaoFinalizarRequest(BaseModel):
