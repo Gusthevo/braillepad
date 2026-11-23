@@ -8,7 +8,7 @@ class ApiService {
   static String get baseUrl {
     const configuredUrl = String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: '',
+      defaultValue: 'http://192.168.68.126:8000',
     );
 
     if (configuredUrl.isNotEmpty) {

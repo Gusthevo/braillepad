@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/sessao_service.dart';
 import '../services/braillepad_ble_service.dart';
+import '../services/tts_service.dart';
 import 'resumo_sessao_screen.dart';
 
 enum EtapaAtividade { tutorial, fase01Ordenada, conclusaoFase01, fase02Randomizada }
@@ -28,6 +29,8 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
 
   int _alvoIndex = 0;
   int _tentativasNoAlvoAtual = 0;
+  int _letraPosicaoNoAlvo = 0;
+  final List<String> _letrasJaCompletadas = [];
 
   int _totalAcertosFase = 0;
   int _totalErrosFase = 0;
@@ -74,12 +77,33 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
         _registrarResposta(fichaLida);
       }
     });
+
+    // Anuncia por voz o primeiro alvo a ser apresentado
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _anunciarAlvoAtual();
+    });
+  }
+
+  void _anunciarAlvoAtual() {
+    if (_etapaAtual == EtapaAtividade.conclusaoFase01) return;
+    List<String> listaAtual = (_etapaAtual == EtapaAtividade.fase02Randomizada)
+        ? _alvosRandomizados
+        : _alvosAtividade;
+    if (_alvoIndex < listaAtual.length) {
+      String alvo = listaAtual[_alvoIndex];
+      TtsService.instance.falarComandoAlvo(
+        alvo,
+        posicaoAtual: _letraPosicaoNoAlvo,
+        tamanhoTotal: alvo.length,
+      );
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _rfidSubscription?.cancel();
+    TtsService.instance.parar();
     super.dispose();
   }
 
@@ -109,71 +133,104 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
         : _alvosAtividade;
 
     String alvoSolicitado = listaAtual[_alvoIndex];
+    String fichaLimpa = fichaTocada.trim().toUpperCase();
+    String alvoLimpo = alvoSolicitado.trim().toUpperCase();
+
+    // Se o alvo for palavra/sílaba composta (ex: MALA) e for apresentada uma única ficha (ex: M):
+    String letraEsperada = (alvoLimpo.length > 1 && _letraPosicaoNoAlvo < alvoLimpo.length)
+        ? alvoLimpo[_letraPosicaoNoAlvo]
+        : alvoLimpo;
+
     bool isCorreta;
+    bool alvoCompletado = false;
 
     if (_etapaAtual == EtapaAtividade.tutorial) {
-      isCorreta = _alvosAtividade.contains(fichaTocada);
+      isCorreta = _alvosAtividade.contains(fichaLimpa) || alvoLimpo.contains(fichaLimpa);
+      alvoCompletado = true;
+    } else if (fichaLimpa == alvoLimpo) {
+      // Leitura da palavra/sílaba completa
+      isCorreta = true;
+      alvoCompletado = true;
+    } else if (fichaLimpa == letraEsperada) {
+      // Leitura correta da ficha na posição sequencial da palavra/sílaba
+      isCorreta = true;
+      _letrasJaCompletadas.add(fichaLimpa);
+      _letraPosicaoNoAlvo++;
+      if (_letraPosicaoNoAlvo >= alvoLimpo.length) {
+        alvoCompletado = true;
+      }
     } else {
-      isCorreta = (fichaTocada == alvoSolicitado);
+      isCorreta = false;
+      alvoCompletado = false;
     }
 
     await SessaoService.registrarLeituraFicha(
       widget.sessao['id'],
       alvoId: 'alvo_${alvoSolicitado.toLowerCase()}',
-      posicao: _tentativasNoAlvoAtual + 1,
-      fichaCodigo: 'FICHA_$fichaTocada',
+      posicao: _letraPosicaoNoAlvo > 0 ? _letraPosicaoNoAlvo : (_tentativasNoAlvoAtual + 1),
+      fichaCodigo: 'FICHA_$fichaLimpa',
       correta: isCorreta,
     );
 
     if (!mounted) return;
 
     setState(() {
-      _tentativasNoAlvoAtual++;
-
       if (_etapaAtual == EtapaAtividade.tutorial) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isCorreta
-                ? 'Acerto no Tutorial! Ficha $fichaTocada testada no BraillePad.'
-                : 'Ficha incorreta testada no tutorial.'),
+                ? 'Acerto no Tutorial! Ficha $fichaLimpa reconhecida no BraillePad.'
+                : 'Ficha $fichaLimpa testada no tutorial.'),
             backgroundColor: isCorreta ? Colors.green : Colors.orange.shade800,
             duration: const Duration(milliseconds: 800),
           ),
         );
+        TtsService.instance.falar(isCorreta ? "Ficha $fichaLimpa testada com sucesso." : "Ficha $fichaLimpa testada.");
         return;
       }
 
-      // Fases 01 e 02
       if (isCorreta) {
-        _totalAcertosFase++;
+        if (alvoCompletado) {
+          _totalAcertosFase++;
+          if (_totalAcertosFase % 3 == 0) _badgesPositivas++;
 
-        if (_totalAcertosFase % 3 == 0) {
-          _badgesPositivas++;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Excelente! $alvoLimpo completada com sucesso! 🎉'),
+              backgroundColor: Colors.green,
+              duration: const Duration(milliseconds: 1000),
+            ),
+          );
+          TtsService.instance.falar("Excelente! $alvoLimpo completada com sucesso!");
+          _avancarParaProximoAlvoOuFase();
+        } else {
+          // Letra correta no meio da palavra (ex: 'M' de 'MALA')
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Letra "$fichaLimpa" reconhecida! Próxima letra esperada: "${alvoLimpo[_letraPosicaoNoAlvo]}"'),
+              backgroundColor: Colors.green.shade700,
+              duration: const Duration(milliseconds: 900),
+            ),
+          );
+          TtsService.instance.falar("Letra $fichaLimpa reconhecida. Próxima letra: ${alvoLimpo[_letraPosicaoNoAlvo]}");
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Acerto! Ficha $fichaTocada reconhecida.'),
-            backgroundColor: Colors.green,
-            duration: const Duration(milliseconds: 800),
-          ),
-        );
-
-        _avancarParaProximoAlvoOuFase();
       } else {
         _totalErrosFase++;
+        _tentativasNoAlvoAtual++;
+        if (_totalErrosFase % 3 == 0) _badgesNegativas++;
 
-        if (_totalErrosFase % 3 == 0) {
-          _badgesNegativas++;
-        }
+        String msgErro = (alvoLimpo.length > 1)
+            ? 'Incorreto. Para a ${_letraPosicaoNoAlvo + 1}ª letra de $alvoLimpo, a ficha esperada é "$letraEsperada".'
+            : 'Incorreto (Tentativa $_tentativasNoAlvoAtual/3). A ficha esperada era $alvoSolicitado.';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Incorreto (Tentativa $_tentativasNoAlvoAtual/3). A ficha esperada era $alvoSolicitado.'),
+            content: Text(msgErro),
             backgroundColor: Colors.red.shade700,
-            duration: const Duration(milliseconds: 1000),
+            duration: const Duration(milliseconds: 1200),
           ),
         );
+        TtsService.instance.falar("Incorreto. A letra esperada é $letraEsperada");
 
         if (_tentativasNoAlvoAtual >= 3) {
           _avancarParaProximoAlvoOuFase();
@@ -189,9 +246,12 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
 
     setState(() {
       _tentativasNoAlvoAtual = 0;
+      _letraPosicaoNoAlvo = 0;
+      _letrasJaCompletadas.clear();
 
       if (_alvoIndex < listaAtual.length - 1) {
         _alvoIndex++;
+        _anunciarAlvoAtual();
       } else {
         _concluirEtapa();
       }
@@ -553,10 +613,49 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                       Text(
                         _etapaAtual == EtapaAtividade.tutorial
                             ? 'Aproxime qualquer ficha no leitor RFID do PAD para ouvir a resposta do aparelho.'
-                            : 'Apresente a ficha de "$alvoSolicitado" no leitor RFID do BraillePad ou toque abaixo:',
+                            : 'Apresente as fichas para formar "$alvoSolicitado" no leitor RFID do BraillePad:',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 12),
                       ),
+                      if (_etapaAtual != EtapaAtividade.tutorial && alvoSolicitado.length > 1) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(alvoSolicitado.length, (index) {
+                            final isDone = index < _letrasJaCompletadas.length;
+                            final isCurrent = index == _letraPosicaoNoAlvo && !isDone;
+                            final char = isDone
+                                ? _letrasJaCompletadas[index]
+                                : (isCurrent ? '?' : '_');
+
+                            return Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: 38,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: isDone
+                                    ? Colors.green.shade600
+                                    : (isCurrent ? AppTheme.primaryOrange : Colors.grey.shade200),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isCurrent ? AppTheme.primaryOrange : Colors.grey.shade400,
+                                  width: isCurrent ? 2.5 : 1.0,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  char,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: (isDone || isCurrent) ? Colors.white : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
                     ],
                   ),
                 ),

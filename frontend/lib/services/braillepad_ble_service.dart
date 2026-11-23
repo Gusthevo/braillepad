@@ -196,7 +196,9 @@ class BraillepadBleService extends ChangeNotifier {
     _updateStatus('Conectando ao BRAILLEPAD...');
 
     try {
-      await FlutterBluePlus.stopScan();
+      try {
+        await FlutterBluePlus.stopScan();
+      } catch (_) {}
       await _connectionSubscription?.cancel();
       _connectedDevice = device;
       _connectionSubscription = device.connectionState.listen((state) {

@@ -12,15 +12,24 @@ dependencies:
   cupertino_icons: ^1.0.6
   http: ^1.2.0
   shared_preferences: ^2.2.2
-  # BLE: fixar versoes para estabilizar a integracao.
+  # BLE e Acessibilidade por Voz (TTS)
   flutter_blue_plus: 2.3.15
   permission_handler: 12.0.1
   device_info_plus: 11.5.0
+  flutter_tts: ^4.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: false
+  image_path: "assets/images/TixaLogo - transparente.png"
+  adaptive_icon_background: "#00000000"
+  adaptive_icon_foreground: "assets/images/TixaLogo - transparente.png"
 
 flutter:
   uses-material-design: true
