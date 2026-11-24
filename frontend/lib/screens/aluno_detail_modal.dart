@@ -58,11 +58,11 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.swap_horiz_rounded, color: AppTheme.primaryOrange),
-              SizedBox(width: 8),
-              Text('Transferir Aluno'),
+              const SizedBox(width: 8),
+              const Text('Transferir Aluno'),
             ],
           ),
           content: Column(
@@ -197,7 +197,7 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
-        child: const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
+        child: Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
       );
     }
 
@@ -243,7 +243,7 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                  child: const Icon(Icons.person_rounded, size: 36, color: AppTheme.primaryOrange),
+                  child: Icon(Icons.person_rounded, size: 36, color: AppTheme.primaryOrange),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -252,7 +252,7 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
                     children: [
                       Text(
                         '${_aluno!['nome']} ${_aluno!['sobrenome']}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.darkText,
@@ -261,7 +261,7 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.groups_rounded, size: 16, color: AppTheme.primaryOrange),
+                          Icon(Icons.groups_rounded, size: 16, color: AppTheme.primaryOrange),
                           const SizedBox(width: 4),
                           Text(
                             _aluno!['turma_nome'] ?? 'Sem Turma',
@@ -283,7 +283,7 @@ class _AlunoDetailModalState extends State<AlunoDetailModal> {
               runSpacing: 8,
               children: [
                 Chip(
-                  avatar: const Icon(Icons.grain_rounded, size: 16, color: AppTheme.primaryOrange),
+                  avatar: Icon(Icons.grain_rounded, size: 16, color: AppTheme.primaryOrange),
                   label: Text('Braille: ${_aluno!['nivel_braille'] ?? 'INICIANTE'}'),
                   backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
                 ),

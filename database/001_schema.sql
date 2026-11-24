@@ -41,7 +41,9 @@ CREATE TABLE preferencia_professor (
     vibracao_ativa BOOLEAN NOT NULL DEFAULT TRUE,
     volume_som INTEGER NOT NULL DEFAULT 80 CHECK (volume_som BETWEEN 0 AND 100),
     modo_execucao_padrao VARCHAR(12) NOT NULL DEFAULT 'MANUAL'
-        CHECK (modo_execucao_padrao IN ('MANUAL','SIMULACAO'))
+        CHECK (modo_execucao_padrao IN ('MANUAL','PAD')),
+    volume_voz INTEGER NOT NULL DEFAULT 100 CHECK (volume_voz BETWEEN 0 AND 100),
+    velocidade_fala NUMERIC(3,2) NOT NULL DEFAULT 0.50 CHECK (velocidade_fala BETWEEN 0.20 AND 1.00)
 );
 
 CREATE TABLE turma (

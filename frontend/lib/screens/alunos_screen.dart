@@ -113,7 +113,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Cadastrar Novo Aluno',
                       style: TextStyle(
                         fontSize: 20,
@@ -370,7 +370,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                     onChanged: (val) => setState(() => _searchQuery = val),
                     decoration: InputDecoration(
                       hintText: 'Buscar aluno por nome...',
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primaryOrange),
+                      prefixIcon: Icon(Icons.search_rounded, color: AppTheme.primaryOrange),
                       filled: true,
                       fillColor: AppTheme.warmBackground,
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -419,7 +419,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
             // Student List View
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+                  ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
                   : filtered.isEmpty
                       ? Center(
                           child: Column(
@@ -453,7 +453,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                                 onTap: () => _showAlunoDetailModal(aluno['id']),
                                 leading: CircleAvatar(
                                   backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                                  child: const Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
+                                  child: Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
                                 ),
                                 title: Text(
                                   '${aluno['nome']} ${aluno['sobrenome']}',
