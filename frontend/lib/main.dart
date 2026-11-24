@@ -60,6 +60,12 @@ class _BraillepadAppState extends State<BraillepadApp> {
       title: 'BraillePad MVP',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.themeData,
+      // Sem animação entre os temas: as telas já trocam de cor na hora (via
+      // AppTheme), e interpolar o tema normal com o de alto contraste falha
+      // nos estilos de texto dos botões ("Failed to interpolate TextStyles"),
+      // erro que deixava a árvore quebrada e causava o "GlobalKey was used
+      // multiple times".
+      themeAnimationDuration: Duration.zero,
       builder: (context, child) {
         // Tamanho da letra escolhido pelo professor, somado ao do sistema.
         final mq = MediaQuery.of(context);

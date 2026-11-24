@@ -47,6 +47,13 @@ class AppTheme {
 
   static ThemeData get themeData => altoContraste ? _temaAltoContraste() : _temaNormal();
 
+  // Texto dos botões contornados e de texto, igual ao padrão do Material 3.
+  // Os dois temas precisam definir os mesmos estilos de botão: o Flutter anima
+  // o texto do botão ao trocar de tema e não consegue interpolar um estilo
+  // padrão com um estilo parcial ("Failed to interpolate TextStyles"), erro
+  // que quebrava a árvore e gerava "A GlobalKey was used multiple times".
+  static const _textoBotao = TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.43);
+
   static ThemeData _temaNormal() {
     return ThemeData(
       useMaterial3: true,
@@ -79,6 +86,12 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(textStyle: _textoBotao),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(textStyle: _textoBotao),
       ),
       cardTheme: CardThemeData(
         elevation: 6,
@@ -135,13 +148,13 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.black,
           side: borda,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+          textStyle: _textoBotao.copyWith(fontWeight: FontWeight.bold),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: _hcPrimaria,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+          textStyle: _textoBotao.copyWith(fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
         ),
       ),
       cardTheme: CardThemeData(
