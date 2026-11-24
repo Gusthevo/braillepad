@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'preferencias_service.dart';
@@ -176,6 +177,62 @@ class AuthService {
       debugPrint('Update profile error: $e');
       return false;
     }
+  }
+
+  // 4b. Foto de perfil: envia o arquivo (o servidor valida e padroniza).
+  /// Devolve `null` em caso de sucesso, ou a mensagem de erro.
+  static Future<String?> enviarFoto(String caminhoArquivo) async {
+    if (!isLoggedIn) return 'Sessão expirada. Entre novamente.';
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('${ApiService.baseUrl}/api/auth/foto'))
+        ..headers['Authorization'] = 'Bearer $_token'
+        ..files.add(await http.MultipartFile.fromPath(
+          'foto',
+          caminhoArquivo,
+          contentType: MediaType('image', 'jpeg'),
+        ));
+      final resposta = await http.Response.fromStream(
+        await req.send().timeout(const Duration(seconds: 30)),
+      );
+      return await _atualizarProfessorDaResposta(resposta);
+    } catch (e) {
+      debugPrint('Erro ao enviar foto: $e');
+      return 'Não foi possível conectar ao servidor.';
+    }
+  }
+
+  /// Remove a foto de perfil. Devolve `null` em caso de sucesso.
+  static Future<String?> removerFoto() async {
+    if (!isLoggedIn) return 'Sessão expirada. Entre novamente.';
+    try {
+      final resposta = await http
+          .delete(
+            Uri.parse('${ApiService.baseUrl}/api/auth/foto'),
+            headers: {'Authorization': 'Bearer $_token'},
+          )
+          .timeout(const Duration(seconds: 10));
+      return await _atualizarProfessorDaResposta(resposta);
+    } catch (e) {
+      debugPrint('Erro ao remover foto: $e');
+      return 'Não foi possível conectar ao servidor.';
+    }
+  }
+
+  static Future<String?> _atualizarProfessorDaResposta(http.Response resposta) async {
+    Map<String, dynamic>? corpo;
+    try {
+      corpo = jsonDecode(utf8.decode(resposta.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {}
+    if (resposta.statusCode != 200 || corpo == null) {
+      final detalhe = corpo?['detail'];
+      return detalhe is String ? detalhe : 'O servidor respondeu com erro ${resposta.statusCode}.';
+    }
+    _currentProfessor = corpo;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('dtae_professor_data', jsonEncode(corpo));
+    } catch (_) {}
+    return null;
   }
 
   // 5. Logout

@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# Cópias compactadas do projeto (não versionar)
+*.zip

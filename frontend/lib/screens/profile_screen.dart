@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
-import '../services/api_service.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import '../widgets/avatar_professor.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -42,81 +44,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showAvatarPickerModal() {
-    final urlController = TextEditingController();
+    final temFoto = (AuthService.currentProfessor?['foto_url'] as String?)?.isNotEmpty ?? false;
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) => SafeArea(
         child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Foto de perfil',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Alterar Foto de Perfil',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
-                ),
+              ListTile(
+                leading: Icon(Icons.photo_camera_rounded, color: AppTheme.primaryOrange),
+                title: const Text('Tirar foto'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _escolherFoto(ImageSource.camera);
+                },
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Insira o link (URL) da sua imagem de perfil',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ListTile(
+                leading: Icon(Icons.photo_library_rounded, color: AppTheme.primaryOrange),
+                title: const Text('Escolher da galeria'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _escolherFoto(ImageSource.gallery);
+                },
               ),
-              const SizedBox(height: 20),
-
-              // Custom URL Input
-              TextField(
-                controller: urlController,
-                decoration: InputDecoration(
-                  labelText: 'URL da Imagem de Perfil',
-                  hintText: 'https://exemplo.com/sua_foto.jpg',
-                  prefixIcon: const Icon(Icons.link_rounded),
-                  filled: true,
-                  fillColor: AppTheme.warmBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final customUrl = urlController.text.trim();
-                    if (customUrl.isNotEmpty) {
-                      Navigator.pop(context);
-                      _updatePhoto(customUrl);
-                    }
+              if (temFoto)
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: Colors.red.shade700),
+                  title: Text('Remover foto', style: TextStyle(color: Colors.red.shade700)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _removerFoto();
                   },
-                  child: const Text('Salvar Foto'),
                 ),
-              ),
             ],
           ),
         ),
@@ -124,50 +96,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _updatePhoto(String photoUrl) async {
-    setState(() => _isLoading = true);
+  /// Escolhe a foto, abre o recorte circular e envia. O app já reduz a imagem
+  /// (até 1024 px, JPEG 85%), então o envio fica pequeno mesmo no 4G.
+  Future<void> _escolherFoto(ImageSource origem) async {
+    try {
+      final escolhida = await ImagePicker().pickImage(
+        source: origem,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 90,
+        preferredCameraDevice: CameraDevice.front,
+      );
+      if (escolhida == null) return; // cancelou
 
-    final success = await AuthService.updateProfile(fotoUrl: photoUrl);
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Foto de perfil atualizada no banco de dados!'),
-            backgroundColor: Colors.green,
+      final recortada = await ImageCropper().cropImage(
+        sourcePath: escolhida.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        maxWidth: 1024,
+        maxHeight: 1024,
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 85,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Ajustar foto',
+            toolbarColor: AppTheme.primaryOrange,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: AppTheme.primaryOrange,
+            cropStyle: CropStyle.circle,
+            lockAspectRatio: true,
+            hideBottomControls: false,
+            initAspectRatio: CropAspectRatioPreset.square,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao atualizar foto no servidor.'),
-            backgroundColor: Colors.redAccent,
+          IOSUiSettings(
+            title: 'Ajustar foto',
+            cropStyle: CropStyle.circle,
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+            aspectRatioPresets: [CropAspectRatioPreset.square],
           ),
-        );
-      }
+        ],
+      );
+      if (recortada == null) return; // cancelou no recorte
+
+      await _executar(() => AuthService.enviarFoto(recortada.path), 'Foto de perfil atualizada.');
+    } catch (e) {
+      debugPrint('Erro ao escolher foto: $e');
+      _avisar('Não foi possível abrir a ${origem == ImageSource.camera ? 'câmera' : 'galeria'}.', erro: true);
     }
+  }
+
+  Future<void> _removerFoto() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remover foto?'),
+        content: const Text('No lugar da foto aparecerão as suas iniciais.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remover')),
+        ],
+      ),
+    );
+    if (confirmar == true) await _executar(AuthService.removerFoto, 'Foto removida.');
+  }
+
+  Future<void> _executar(Future<String?> Function() acao, String sucesso) async {
+    setState(() => _isLoading = true);
+    final erro = await acao();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _avisar(erro ?? sucesso, erro: erro != null);
+  }
+
+  void _avisar(String mensagem, {bool erro = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(mensagem),
+        backgroundColor: erro ? Colors.red.shade700 : Colors.green.shade700,
+      ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final prof = AuthService.currentProfessor ?? {
-      'nome': 'Professor(a)',
-      'sobrenome': 'DTAE',
-      'email': 'professor@escola.edu.br',
-      'foto_url': null,
-      'instituicao': 'Atendimento Educacional Especializado',
-      'especialidade': 'Educação Especial e Braille',
-    };
+    final prof = AuthService.currentProfessor ??
+        {
+          'nome': 'Professor(a)',
+          'sobrenome': 'DTAE',
+          'email': 'professor@escola.edu.br',
+          'foto_url': null,
+          'instituicao': 'Atendimento Educacional Especializado',
+          'especialidade': 'Educação Especial e Braille',
+        };
 
     final nomeCompleto = '${prof['nome'] ?? ''} ${prof['sobrenome'] ?? ''}'.trim();
-    String? fotoUrl = prof['foto_url'];
-
-    // Resolve relative static URLs if returned from backend
-    if (fotoUrl != null && fotoUrl.startsWith('/static/')) {
-      fotoUrl = '${ApiService.baseUrl}$fotoUrl';
-    }
+    final String? fotoUrl = prof['foto_url'];
 
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
@@ -193,56 +218,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     // Interactive Profile Avatar with Camera Icon Overlay
-                    GestureDetector(
-                      onTap: _isLoading ? null : _showAvatarPickerModal,
-                      child: Stack(
-                        children: [
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                              border: Border.all(
-                                color: AppTheme.primaryOrange,
-                                width: 3,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child: fotoUrl != null && fotoUrl.isNotEmpty
-                                  ? Image.network(
-                                      fotoUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => Icon(
-                                        Icons.person_rounded,
-                                        size: 58,
-                                        color: AppTheme.primaryOrange,
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.person_rounded,
-                                      size: 58,
-                                      color: AppTheme.primaryOrange,
-                                    ),
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
+                    Semantics(
+                      button: true,
+                      label: 'Alterar foto de perfil',
+                      child: GestureDetector(
+                        onTap: _isLoading ? null : _showAvatarPickerModal,
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryOrange,
                                 shape: BoxShape.circle,
+                                border: Border.all(color: AppTheme.primaryOrange, width: 3),
                               ),
-                              child: const Icon(
-                                Icons.camera_alt_rounded,
-                                size: 18,
-                                color: Colors.white,
+                              child: AvatarProfessor(fotoUrl: fotoUrl, nome: nomeCompleto, tamanho: 100),
+                            ),
+                            if (_isLoading)
+                              const Positioned.fill(
+                                child: Padding(
+                                  padding: EdgeInsets.all(3),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black45),
+                                    child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                                  ),
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryOrange,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
 

@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   http: ^1.2.0
+  http_parser: 4.1.2
   shared_preferences: ^2.2.2
   # BLE e Acessibilidade por Voz (TTS)
   flutter_blue_plus: 2.3.15
@@ -19,6 +20,8 @@ dependencies:
   flutter_tts: ^4.2.0
   audioplayers: 6.1.0
   vibration: 3.2.1
+  image_picker: 1.2.4
+  image_cropper: 14.0.0
 
 dev_dependencies:
   flutter_test:

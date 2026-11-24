@@ -18,6 +18,8 @@ from ..schemas.auth_schema import (
     AuthTokenResponse,
 )
 from ..schemas.preferencia_schema import PreferenciaResponse, PreferenciaUpdateRequest
+from ..services.armazenamento_service import obter_armazenamento
+from ..services.foto_service import normalizar_foto_perfil, TAMANHO_MAXIMO_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +256,69 @@ def update_user_profile(
                 especialidade=p.get("especialidade"),
             )
         raise HTTPException(status_code=404, detail="Professor não encontrado.")
+
+
+def _professor_por_id(cur, prof_id: str) -> ProfessorResponse:
+    cur.execute(
+        "SELECT id, nome, sobrenome, email, foto_url, instituicao, especialidade FROM professor WHERE id = %s::uuid",
+        (prof_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Professor não encontrado.")
+    return ProfessorResponse(
+        id=str(row[0]), nome=row[1], sobrenome=row[2], email=row[3],
+        foto_url=row[4], instituicao=row[5], especialidade=row[6],
+    )
+
+
+def _trocar_foto(prof_id: str, nova_url: str | None) -> ProfessorResponse:
+    """Grava a nova foto_url e só então apaga o arquivo antigo."""
+    armazenamento = obter_armazenamento()
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT foto_url FROM professor WHERE id = %s::uuid FOR UPDATE", (prof_id,))
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Professor não encontrado.")
+                antiga = row[0]
+                cur.execute(
+                    "UPDATE professor SET foto_url = %s, atualizado_em = now() WHERE id = %s::uuid",
+                    (nova_url, prof_id),
+                )
+                professor = _professor_por_id(cur, prof_id)
+            conn.commit()
+    except HTTPException:
+        armazenamento.remover(nova_url)
+        raise
+    except Exception:
+        armazenamento.remover(nova_url)  # não deixa arquivo órfão
+        logger.exception("Falha ao atualizar foto do professor")
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível. A foto não foi salva.")
+    if antiga != nova_url:
+        armazenamento.remover(antiga)
+    return professor
+
+
+@router.post("/foto", response_model=ProfessorResponse)
+def enviar_foto_perfil(
+    foto: UploadFile = File(..., description="Imagem JPG, PNG ou WEBP (até 8 MB)"),
+    prof_id: str = Depends(get_current_professor_id),
+):
+    """Recebe a foto de perfil, valida, padroniza (512×512 JPEG sem EXIF) e guarda."""
+    # Rota síncrona: o FastAPI a roda numa thread, sem travar as outras requisições
+    # enquanto o Pillow processa a imagem.
+    conteudo = foto.file.read(TAMANHO_MAXIMO_BYTES + 1)
+    jpeg = normalizar_foto_perfil(conteudo)
+    url = obter_armazenamento().salvar("fotos", jpeg, "jpg")
+    return _trocar_foto(prof_id, url)
+
+
+@router.delete("/foto", response_model=ProfessorResponse)
+def remover_foto_perfil(prof_id: str = Depends(get_current_professor_id)):
+    """Remove a foto de perfil (o app volta a mostrar as iniciais)."""
+    return _trocar_foto(prof_id, None)
 
 
 _COLUNAS_PREFERENCIA = (
