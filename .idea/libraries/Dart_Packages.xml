@@ -667,6 +667,20 @@
             </list>
           </value>
         </entry>
+        <entry key="vibration">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/vibration-3.2.1/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="vibration_platform_interface">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/vibration_platform_interface-0.1.2/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="vm_service">
           <value>
             <list>
@@ -810,6 +824,8 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/typed_data-1.4.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/uuid-4.6.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/vector_math-2.4.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/vibration-3.2.1/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/vibration_platform_interface-0.1.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/vm_service-15.4.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/web-1.1.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/win32-5.15.0/lib" />

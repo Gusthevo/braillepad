@@ -56,7 +56,7 @@ class HealthPadScreen extends StatelessWidget {
                       ? 'Equipamento PAD Conectado'
                       : 'Equipamento PAD Não Conectado',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkText,
@@ -82,7 +82,7 @@ class HealthPadScreen extends StatelessWidget {
                 ],
                 if (isConnected) ...[
                   const SizedBox(height: 28),
-                  const Text(
+                  Text(
                     'Última ficha RFID lida',
                     style: TextStyle(
                       fontSize: 18,
@@ -113,7 +113,7 @@ class HealthPadScreen extends StatelessWidget {
                             ble.lastReading!.isRegistered
                                 ? ble.lastReading!.value!
                                 : '?',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 64,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.primaryOrange,
@@ -162,7 +162,7 @@ class HealthPadScreen extends StatelessWidget {
                   ),
                 if (!isConnected && ble.foundDevices.isNotEmpty) ...[
                   const SizedBox(height: 28),
-                  const Text(
+                  Text(
                     'Dispositivos encontrados',
                     style: TextStyle(
                       fontSize: 17,
@@ -174,7 +174,7 @@ class HealthPadScreen extends StatelessWidget {
                   for (final BluetoothDevice device in ble.foundDevices)
                     Card(
                       child: ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.bluetooth_rounded,
                           color: AppTheme.primaryOrange,
                         ),

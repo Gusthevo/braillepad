@@ -129,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 context: context,
                 applicationName: 'BraillePad MVP',
                 applicationVersion: '1.0.0',
-                applicationIcon: const Icon(
+                applicationIcon: Icon(
                   Icons.school_rounded,
                   color: AppTheme.primaryOrange,
                   size: 40,
@@ -235,7 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: AppTheme.primaryOrange.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.dashboard_rounded,
                       color: AppTheme.primaryOrange,
                       size: 28,

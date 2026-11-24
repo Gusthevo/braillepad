@@ -193,11 +193,11 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                                 const SizedBox(width: 8),
                                 Row(
                                   children: [
-                                    const Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 18),
+                                    Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 18),
                                     const SizedBox(width: 4),
                                     Text(
                                       'Duração: ${_formatarDuracao(duracaoSec)}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange, fontSize: 13),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange, fontSize: 13),
                                     ),
                                   ],
                                 ),
@@ -212,7 +212,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
 
                     // Alertas Automáticos Gerados (Seção 1.1)
                     if (alertas.isNotEmpty) ...[
-                      const Text(
+                      Text(
                         'Alertas Automáticos da Atividade:',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                       ),
@@ -231,7 +231,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     ],
 
                     // Questionário de Acompanhamento (Perguntas 1 a 4)
-                    const Text(
+                    Text(
                       'Acompanhamento do Professor (Nível de Auxílio):',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                     ),
@@ -243,7 +243,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 1 — Nível de auxílio na Fase 01',
-                        prefixIcon: const Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
+                        prefixIcon: Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -269,7 +269,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 2 — Nível de auxílio na Fase 02',
-                        prefixIcon: const Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
+                        prefixIcon: Icon(Icons.handshake_outlined, color: AppTheme.primaryOrange),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -295,7 +295,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 3 — Compreendeu as instruções?',
-                        prefixIcon: const Icon(Icons.psychology_outlined, color: AppTheme.primaryOrange),
+                        prefixIcon: Icon(Icons.psychology_outlined, color: AppTheme.primaryOrange),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -319,7 +319,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Pergunta 4 — Autonomia na exploração das fichas',
-                        prefixIcon: const Icon(Icons.explore_outlined, color: AppTheme.primaryOrange),
+                        prefixIcon: Icon(Icons.explore_outlined, color: AppTheme.primaryOrange),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -338,7 +338,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                     const SizedBox(height: 20),
 
                     // Avaliação Geral por Estrelas (1 a 5 ★★★★★)
-                    const Text(
+                    Text(
                       'Avaliação Geral do Professor (Escala de Estrelas):',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                     ),
@@ -385,7 +385,7 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                       decoration: InputDecoration(
                         labelText: 'Anotações e Observações Pedagógicas',
                         hintText: 'Registre dificuldades observadas, estratégias e intervenções realizadas...',
-                        prefixIcon: const Icon(Icons.edit_note_rounded, color: AppTheme.primaryOrange),
+                        prefixIcon: Icon(Icons.edit_note_rounded, color: AppTheme.primaryOrange),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -416,10 +416,10 @@ class _ResumoSessaoScreenState extends State<ResumoSessaoScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _repetirAtividade,
-                      icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryOrange),
-                      label: const Text('Repetir Atividade', style: TextStyle(color: AppTheme.primaryOrange)),
+                      icon: Icon(Icons.refresh_rounded, color: AppTheme.primaryOrange),
+                      label: Text('Repetir Atividade', style: TextStyle(color: AppTheme.primaryOrange)),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppTheme.primaryOrange),
+                        side: BorderSide(color: AppTheme.primaryOrange),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),

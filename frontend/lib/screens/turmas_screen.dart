@@ -72,7 +72,7 @@ class _TurmasScreenState extends State<TurmasScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Criar Nova Turma',
                       style: TextStyle(
                         fontSize: 20,
@@ -313,7 +313,7 @@ class _TurmasScreenState extends State<TurmasScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+            ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
             : _turmas.isEmpty
                 ? Center(
                     child: Column(
@@ -440,7 +440,7 @@ class _TurmasScreenState extends State<TurmasScreen> {
                     children: [
                       CircleAvatar(
                         backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                        child: const Icon(Icons.groups_rounded, color: AppTheme.primaryOrange),
+                        child: Icon(Icons.groups_rounded, color: AppTheme.primaryOrange),
                       ),
                       if (!isArquivada)
                         IconButton(

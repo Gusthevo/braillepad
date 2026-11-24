@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'preferencias_service.dart';
 
 class AuthService {
   static String? _token;
@@ -36,6 +37,8 @@ class AuthService {
     } catch (e) {
       debugPrint('Error saving session: $e');
     }
+    // Aplica o alto contraste, a fonte e a voz do professor que acabou de entrar.
+    await PreferenciasService.carregar();
   }
 
   // 1. Cadastrar Novo Professor (RF-001)
@@ -179,6 +182,7 @@ class AuthService {
   static Future<void> logout() async {
     _token = null;
     _currentProfessor = null;
+    await PreferenciasService.limpar();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('dtae_jwt_token');

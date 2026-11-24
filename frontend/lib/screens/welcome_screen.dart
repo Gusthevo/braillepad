@@ -17,7 +17,7 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: AppTheme.welcomeGradient,
         ),
         child: Stack(
@@ -79,7 +79,7 @@ class WelcomeScreen extends StatelessWidget {
                             'assets/images/TixaLogo - transparente.png',
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
+                              return Icon(
                                 Icons.gesture_rounded,
                                 size: 64,
                                 color: AppTheme.primaryOrange,
@@ -152,7 +152,7 @@ class WelcomeScreen extends StatelessWidget {
                             ),
                             elevation: 0,
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
@@ -163,7 +163,7 @@ class WelcomeScreen extends StatelessWidget {
                                   color: AppTheme.primaryOrange,
                                 ),
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Icon(
                                 Icons.arrow_forward_rounded,
                                 size: 24,

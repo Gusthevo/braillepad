@@ -50,7 +50,7 @@ class _ModulosScreenState extends State<ModulosScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+              ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
               : _modulos.isEmpty
                   ? const Center(child: Text('Nenhum módulo encontrado.'))
                   : ListView.builder(
@@ -74,7 +74,7 @@ class _ModulosScreenState extends State<ModulosScreen> {
                               ),
                               child: Text(
                                 '${mod['numero']}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.primaryOrange,
                                   fontSize: 18,
@@ -83,7 +83,7 @@ class _ModulosScreenState extends State<ModulosScreen> {
                             ),
                             title: Text(
                               mod['nome'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
                                 color: AppTheme.darkText,
@@ -105,7 +105,7 @@ class _ModulosScreenState extends State<ModulosScreen> {
                                       ),
                                     );
                                   },
-                                  leading: const Icon(Icons.extension_outlined, color: AppTheme.primaryOrange),
+                                  leading: Icon(Icons.extension_outlined, color: AppTheme.primaryOrange),
                                   title: Text(
                                     atv['titulo'] ?? '',
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),

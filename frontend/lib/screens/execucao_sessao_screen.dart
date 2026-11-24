@@ -5,6 +5,7 @@ import '../services/sessao_service.dart';
 import '../services/braillepad_ble_service.dart';
 import '../services/tts_service.dart';
 import '../services/feedback_service.dart';
+import '../services/preferencias_service.dart';
 import 'resumo_sessao_screen.dart';
 
 enum EtapaAtividade { tutorial, fase01Ordenada, conclusaoFase01, fase02Randomizada }
@@ -87,7 +88,8 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
       }
     });
 
-    FeedbackService.instance.carregarPreferencias();
+    // Garante as preferências mais recentes (sem conexão, usa as últimas conhecidas).
+    PreferenciasService.carregar();
 
     // Anuncia por voz o primeiro alvo a ser apresentado
     Future.delayed(const Duration(milliseconds: 600), () {
@@ -130,6 +132,123 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
             tamanhoTotal: alvo.length,
           ));
     }
+  }
+
+  /// No modo PAD o professor pode liberar o toque só nesta sessão (PAD sem bateria, por ex.).
+  bool _toqueLiberadoNestaSessao = false;
+
+  /// Fichas individuais para o modo de toque: as mesmas que existem no PAD
+  /// (vogais primeiro, depois consoantes). Assim "MALA" é montada letra por
+  /// letra, e o registro é idêntico ao das fichas físicas.
+  List<String> get _fichasParaToque {
+    final letras = <String>{for (final a in _alvosAtividade) ...a.split('')};
+    const vogais = 'AEIOU';
+    final lista = letras.toList()
+      ..sort((a, b) {
+        final va = vogais.contains(a), vb = vogais.contains(b);
+        if (va != vb) return va ? -1 : 1;
+        return a.compareTo(b);
+      });
+    return lista;
+  }
+
+  Widget _buildEntradaFichas() {
+    return ListenableBuilder(
+      listenable: Listenable.merge([PreferenciasService.atual, BraillepadBleService.instance]),
+      builder: (context, _) {
+        final modoPad = PreferenciasService.atual.value.modoExecucao == ModoExecucao.pad;
+        final padConectado = BraillepadBleService.instance.connected;
+        if (modoPad && !_toqueLiberadoNestaSessao) return _buildAvisoModoPad(padConectado);
+
+        return Column(
+          children: [
+            Text(
+              modoPad ? 'Toque liberado nesta sessão:' : 'Toque na ficha apresentada pela criança:',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: _fichasParaToque.map((f) {
+                return SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: Semantics(
+                    button: true,
+                    label: 'Ficha $f',
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.primaryOrange,
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(color: AppTheme.primaryOrange, width: 2),
+                        ),
+                        padding: EdgeInsets.zero,
+                      ),
+                      onPressed: () => _registrarResposta(f),
+                      child: Text(f, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            if (padConectado) ...[
+              const SizedBox(height: 6),
+              Text(
+                'As fichas do PAD também são aceitas.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAvisoModoPad(bool padConectado) {
+    final cor = padConectado ? Colors.green.shade700 : Colors.red.shade700;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cor, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(padConectado ? Icons.sensors_rounded : Icons.sensors_off_rounded, color: cor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  padConectado
+                      ? 'Modo PAD: aproxime as fichas no BraillePad.'
+                      : 'O BraillePad não está conectado. No modo PAD só as fichas lidas por ele contam.',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: cor),
+                ),
+              ),
+            ],
+          ),
+          if (!padConectado) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() => _toqueLiberadoNestaSessao = true),
+                icon: const Icon(Icons.touch_app_rounded),
+                label: const Text('Usar toque nesta sessão'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -420,7 +539,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                   child: Icon(Icons.stars_rounded, color: Colors.green.shade700, size: 72),
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Fase 01 (Sequência Ordenada) Concluída!',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.darkText),
@@ -572,11 +691,11 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 18),
+                              Icon(Icons.timer_outlined, color: AppTheme.primaryOrange, size: 18),
                               const SizedBox(width: 4),
                               Text(
                                 _formatarTempo(_segundosDecorridos),
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange, fontSize: 14),
+                                style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange, fontSize: 14),
                               ),
                             ],
                           ),
@@ -612,7 +731,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                     children: [
                       CircleAvatar(
                         backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                        child: const Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
+                        child: Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -737,42 +856,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
 
               const SizedBox(height: 16),
 
-              Text(
-                'Fichas de $_tipoAlvoNome Apresentadas no PAD:',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText),
-              ),
-              const SizedBox(height: 8),
-
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: _alvosAtividade.map((a) {
-                  return SizedBox(
-                    width: a.length > 3 ? 84 : (a.length > 2 ? 68 : 54),
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryOrange,
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: const BorderSide(color: AppTheme.primaryOrange, width: 2),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      onPressed: () => _registrarResposta(a),
-                      child: FittedBox(
-                        child: Text(
-                          a,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+              _buildEntradaFichas(),
 
               const SizedBox(height: 20),
 
@@ -782,10 +866,10 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _avancarParaProximoAlvoOuFase,
-                        icon: const Icon(Icons.skip_next_rounded, color: AppTheme.primaryOrange),
-                        label: Text('Próxima $_tipoAlvoNome', style: const TextStyle(color: AppTheme.primaryOrange, fontSize: 13)),
+                        icon: Icon(Icons.skip_next_rounded, color: AppTheme.primaryOrange),
+                        label: Text('Próxima $_tipoAlvoNome', style: TextStyle(color: AppTheme.primaryOrange, fontSize: 13)),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppTheme.primaryOrange),
+                          side: BorderSide(color: AppTheme.primaryOrange),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),

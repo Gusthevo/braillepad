@@ -87,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: ClipOval(
                       child: Image.asset(
                         'assets/images/TixaLogo - transparente.png',
-                        errorBuilder: (context, error, stackTrace) => const Icon(
+                        errorBuilder: (context, error, stackTrace) => Icon(
                           Icons.school_rounded,
                           size: 48,
                           color: AppTheme.primaryOrange,
@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  const Text(
+                  Text(
                     'BraillePad',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -231,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           'Cadastre-se',
                           style: TextStyle(
                             color: AppTheme.primaryOrange,

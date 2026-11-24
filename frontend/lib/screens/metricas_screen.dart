@@ -149,7 +149,7 @@ class _MetricasScreenState extends State<MetricasScreen> {
       ),
       body: SafeArea(
         child: _isLoadingTurmas
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+            ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
             : RefreshIndicator(
                 color: AppTheme.primaryOrange,
                 onRefresh: _recarregar,
@@ -163,8 +163,8 @@ class _MetricasScreenState extends State<MetricasScreen> {
                     if (_erroAluno) _buildErroCard('Não foi possível carregar as métricas do aluno.'),
                     if (_erroTurma) _buildErroCard('Não foi possível carregar o relatório da turma.'),
                     if (_isLoadingMetricas && _metricasAluno == null)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
                       ),
                     if (_metricasAluno != null)
@@ -376,7 +376,7 @@ class _Secao extends StatelessWidget {
                         titulo,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                       ),
                       if (subtitulo != null && subtitulo!.isNotEmpty)
                         Text(subtitulo!, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
@@ -443,7 +443,7 @@ class _LinhaHistorico extends StatelessWidget {
         children: [
           SizedBox(
             width: 18,
-            child: naMedia ? const Icon(Icons.star_rounded, size: 16, color: AppTheme.amberAccent) : null,
+            child: naMedia ? Icon(Icons.star_rounded, size: 16, color: AppTheme.amberAccent) : null,
           ),
           const SizedBox(width: 6),
           Expanded(

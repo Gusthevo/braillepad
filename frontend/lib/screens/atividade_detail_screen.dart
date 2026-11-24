@@ -42,7 +42,7 @@ class _AtividadeDetailScreenState extends State<AtividadeDetailScreen> {
       return Scaffold(
         backgroundColor: AppTheme.warmBackground,
         appBar: AppBar(title: const Text('Detalhes da Atividade')),
-        body: const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
+        body: Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
       );
     }
 
@@ -82,7 +82,7 @@ class _AtividadeDetailScreenState extends State<AtividadeDetailScreen> {
                           children: [
                             Text(
                               _atividade!['titulo'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.darkText,
@@ -97,7 +97,7 @@ class _AtividadeDetailScreenState extends State<AtividadeDetailScreen> {
                               const SizedBox(height: 12),
                               Text(
                                 'Objetivo Pedagógico: ${_atividade!['objetivo']}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryOrange),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryOrange),
                               ),
                             ],
                           ],
@@ -108,7 +108,7 @@ class _AtividadeDetailScreenState extends State<AtividadeDetailScreen> {
                     const SizedBox(height: 20),
 
                     // Fases da Atividade Section
-                    const Text(
+                    Text(
                       'Fases da Atividade:',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                     ),
@@ -131,7 +131,7 @@ class _AtividadeDetailScreenState extends State<AtividadeDetailScreen> {
                                     backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
                                     child: Text(
                                       '${fase['ordem']}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryOrange),
                                     ),
                                   ),
                                   title: Text(fase['titulo'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),

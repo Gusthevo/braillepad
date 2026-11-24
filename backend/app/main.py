@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .core.config import settings
+from .core.migracoes import aplicar_migracoes
 from .api import auth, health, scoring, turmas, alunos, atividades, sessoes, metricas
 
 app = FastAPI(
@@ -13,6 +14,11 @@ app = FastAPI(
     version=settings.VERSION,
     description="API REST para a Plataforma DTAE de Apoio à Alfabetização em Braille",
 )
+
+@app.on_event("startup")
+def _migrar_banco() -> None:
+    aplicar_migracoes()
+
 
 # Configurar CORS Middleware
 app.add_middleware(

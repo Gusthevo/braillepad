@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/preferencias_service.dart';
 import '../theme/app_theme.dart';
 import '../services/turma_service.dart';
 import '../services/aluno_service.dart';
@@ -81,7 +82,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
       alunoId: _selectedAlunoId!,
       atividadeId: widget.atividade['id'],
       turmaId: _selectedTurmaId!,
-      modoEntrada: 'MANUAL',
+      modoEntrada: PreferenciasService.atual.value.modoExecucao.codigo,
       encerrarAnterior: encerrarAnterior,
     );
 
@@ -188,7 +189,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
       ),
       body: SafeArea(
         child: _isLoadingTurmas
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+            ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
             : SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.all(20.0),
@@ -207,7 +208,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                                 color: AppTheme.primaryOrange.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.extension_rounded, color: AppTheme.primaryOrange),
+                              child: Icon(Icons.extension_rounded, color: AppTheme.primaryOrange),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -233,7 +234,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                     const SizedBox(height: 24),
 
                     // Step 1: Selecionar Turma (RF-015)
-                    const Text(
+                    Text(
                       '1. Selecione a Turma:',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                     ),
@@ -249,7 +250,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                         : DropdownButtonFormField<String>(
                             initialValue: _selectedTurmaId,
                             decoration: InputDecoration(
-                              prefixIcon: const Icon(Icons.groups_outlined, color: AppTheme.primaryOrange),
+                              prefixIcon: Icon(Icons.groups_outlined, color: AppTheme.primaryOrange),
                               filled: true,
                               fillColor: Colors.white,
                               border: OutlineInputBorder(
@@ -274,14 +275,14 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                     const SizedBox(height: 24),
 
                     // Step 2: Selecionar Aluno (RF-015)
-                    const Text(
+                    Text(
                       '2. Selecione o Aluno para o Atendimento:',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                     ),
                     const SizedBox(height: 8),
 
                     _isLoadingAlunos
-                        ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+                        ? Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
                         : _alunos.isEmpty
                             ? const Card(
                                 child: Padding(
@@ -292,7 +293,7 @@ class _SelecionarTurmaAlunoScreenState extends State<SelecionarTurmaAlunoScreen>
                             : DropdownButtonFormField<String>(
                                 initialValue: _selectedAlunoId,
                                 decoration: InputDecoration(
-                                  prefixIcon: const Icon(Icons.person_outline, color: AppTheme.primaryOrange),
+                                  prefixIcon: Icon(Icons.person_outline, color: AppTheme.primaryOrange),
                                   filled: true,
                                   fillColor: Colors.white,
                                   border: OutlineInputBorder(

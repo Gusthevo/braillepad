@@ -71,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Alterar Foto de Perfil',
                 style: TextStyle(
                   fontSize: 20,
@@ -213,13 +213,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? Image.network(
                                       fotoUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Icon(
+                                      errorBuilder: (context, error, stackTrace) => Icon(
                                         Icons.person_rounded,
                                         size: 58,
                                         color: AppTheme.primaryOrange,
                                       ),
                                     )
-                                  : const Icon(
+                                  : Icon(
                                       Icons.person_rounded,
                                       size: 58,
                                       color: AppTheme.primaryOrange,
@@ -231,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             right: 0,
                             child: Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 color: AppTheme.primaryOrange,
                                 shape: BoxShape.circle,
                               ),
@@ -250,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     Text(
                       nomeCompleto.isEmpty ? 'Professor DTAE' : nomeCompleto,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.darkText,
@@ -270,7 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (prof['instituicao'] != null && prof['instituicao'].toString().isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Chip(
-                        avatar: const Icon(Icons.school_rounded, size: 16, color: AppTheme.primaryOrange),
+                        avatar: Icon(Icons.school_rounded, size: 16, color: AppTheme.primaryOrange),
                         label: Text(prof['instituicao']),
                         backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
                       ),
@@ -288,15 +288,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.badge_outlined, color: AppTheme.primaryOrange),
+                    leading: Icon(Icons.badge_outlined, color: AppTheme.primaryOrange),
                     title: const Text('Especialidade'),
                     subtitle: Text(prof['especialidade'] ?? 'Não informada'),
                   ),
                   const Divider(height: 1),
-                  const ListTile(
+                  ListTile(
                     leading: Icon(Icons.security_outlined, color: AppTheme.primaryOrange),
-                    title: Text('Tipo de Conta'),
-                    subtitle: Text('Professor / Responsável AEE'),
+                    title: const Text('Tipo de Conta'),
+                    subtitle: const Text('Professor / Responsável AEE'),
                   ),
                 ],
               ),

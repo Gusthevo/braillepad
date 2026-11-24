@@ -73,7 +73,7 @@ class _TurmaDetailScreenState extends State<TurmaDetailScreen> {
       return Scaffold(
         backgroundColor: AppTheme.warmBackground,
         appBar: AppBar(title: const Text('Detalhes da Turma')),
-        body: const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
+        body: Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
       );
     }
 
@@ -116,7 +116,7 @@ class _TurmaDetailScreenState extends State<TurmaDetailScreen> {
                   children: [
                     Text(
                       _turma!['nome'] ?? '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.darkText,
@@ -133,17 +133,17 @@ class _TurmaDetailScreenState extends State<TurmaDetailScreen> {
                       runSpacing: 8,
                       children: [
                         Chip(
-                          avatar: const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primaryOrange),
+                          avatar: Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primaryOrange),
                           label: Text('Ano Letivo: ${_turma!['ano_letivo'] ?? '2026'}'),
                           backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
                         ),
                         Chip(
-                          avatar: const Icon(Icons.school_rounded, size: 16, color: AppTheme.primaryOrange),
+                          avatar: Icon(Icons.school_rounded, size: 16, color: AppTheme.primaryOrange),
                           label: Text(_turma!['ano_escolar'] ?? '1º Ano'),
                           backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
                         ),
                         Chip(
-                          avatar: const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.primaryOrange),
+                          avatar: Icon(Icons.access_time_rounded, size: 16, color: AppTheme.primaryOrange),
                           label: Text(_turma!['turno'] ?? 'MANHA'),
                           backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.1),
                         ),
@@ -162,7 +162,7 @@ class _TurmaDetailScreenState extends State<TurmaDetailScreen> {
               children: [
                 Text(
                   'Alunos da Turma (${alunos.length})',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkText,
@@ -214,7 +214,7 @@ class _TurmaDetailScreenState extends State<TurmaDetailScreen> {
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: AppTheme.primaryOrange.withValues(alpha: 0.15),
-                            child: const Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
+                            child: Icon(Icons.person_rounded, color: AppTheme.primaryOrange),
                           ),
                           title: Text(
                             '${aluno['nome']} ${aluno['sobrenome']}',

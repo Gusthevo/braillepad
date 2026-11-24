@@ -1,6 +1,7 @@
 import uuid
 import base64
 import os
+import logging
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, status
 from ..core.database import get_db_connection
 from ..core.security import (
@@ -18,11 +19,12 @@ from ..schemas.auth_schema import (
 )
 from ..schemas.preferencia_schema import PreferenciaResponse, PreferenciaUpdateRequest
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/auth", tags=["Autenticação e Configurações"])
 
 # In-memory storage para fallback em modo dev sem Docker DB
 _IN_MEMORY_PROFESSORES = {}
-_IN_MEMORY_PREFERENCIAS = {}
 
 
 @router.post("/register", response_model=AuthTokenResponse)
@@ -254,42 +256,47 @@ def update_user_profile(
         raise HTTPException(status_code=404, detail="Professor não encontrado.")
 
 
+_COLUNAS_PREFERENCIA = (
+    "tema", "escala_fonte", "alto_contraste", "som_ativo", "vibracao_ativa",
+    "volume_som", "modo_execucao_padrao", "volume_voz", "velocidade_fala",
+)
+
+
+def _ler_preferencias(cur, prof_id: str) -> PreferenciaResponse:
+    cur.execute(
+        "INSERT INTO preferencia_professor (professor_id) VALUES (%s::uuid) ON CONFLICT DO NOTHING",
+        (prof_id,),
+    )
+    cur.execute(
+        f"SELECT {', '.join(_COLUNAS_PREFERENCIA)} FROM preferencia_professor WHERE professor_id = %s::uuid",
+        (prof_id,),
+    )
+    valores = dict(zip(_COLUNAS_PREFERENCIA, cur.fetchone()))
+    valores["escala_fonte"] = float(valores["escala_fonte"])
+    valores["velocidade_fala"] = float(valores["velocidade_fala"])
+    return PreferenciaResponse(professor_id=prof_id, **valores)
+
+
+def _erro_banco_preferencias() -> HTTPException:
+    # Sem fallback em memória: o app precisa saber que a preferência NÃO foi salva.
+    logger.exception("Falha ao acessar preferencia_professor")
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Banco de dados indisponível. As preferências não foram lidas/salvas.",
+    )
+
+
 @router.get("/preferencias", response_model=PreferenciaResponse)
 def get_preferencias_professor(prof_id: str = Depends(get_current_professor_id)):
-    """Obtém as preferências reais do professor salvas na tabela 'preferencia_professor' do PostgreSQL."""
+    """Obtém as preferências do professor (tabela preferencia_professor)."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT professor_id, tema, escala_fonte, alto_contraste, som_ativo, vibracao_ativa, volume_som, modo_execucao_padrao
-                    FROM preferencia_professor
-                    WHERE professor_id::text = %s
-                    """,
-                    (prof_id,),
-                )
-                row = cur.fetchone()
-                if not row:
-                    cur.execute(
-                        "INSERT INTO preferencia_professor (professor_id) VALUES (%s::uuid) ON CONFLICT DO NOTHING",
-                        (prof_id,),
-                    )
-                    conn.commit()
-                    return PreferenciaResponse(professor_id=prof_id)
-
-                return PreferenciaResponse(
-                    professor_id=str(row[0]),
-                    tema=row[1],
-                    escala_fonte=float(row[2]),
-                    alto_contraste=row[3],
-                    som_ativo=row[4],
-                    vibracao_ativa=row[5],
-                    volume_som=row[6],
-                    modo_execucao_padrao=row[7],
-                )
+                pref = _ler_preferencias(cur, prof_id)
+            conn.commit()
+            return pref
     except Exception:
-        pref = _IN_MEMORY_PREFERENCIAS.get(prof_id, PreferenciaResponse(professor_id=prof_id).dict())
-        return PreferenciaResponse(**pref)
+        raise _erro_banco_preferencias()
 
 
 @router.patch("/preferencias", response_model=PreferenciaResponse)
@@ -297,7 +304,8 @@ def update_preferencias_professor(
     request: PreferenciaUpdateRequest,
     prof_id: str = Depends(get_current_professor_id),
 ):
-    """Atualiza as preferências reais do professor salvas na tabela 'preferencia_professor' do PostgreSQL."""
+    """Atualiza somente os campos enviados e devolve as preferências gravadas."""
+    alteracoes = {c: v for c, v in request.model_dump(exclude_none=True).items() if c in _COLUNAS_PREFERENCIA}
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -305,33 +313,14 @@ def update_preferencias_professor(
                     "INSERT INTO preferencia_professor (professor_id) VALUES (%s::uuid) ON CONFLICT DO NOTHING",
                     (prof_id,),
                 )
-                if request.tema:
-                    cur.execute("UPDATE preferencia_professor SET tema = %s WHERE professor_id::text = %s", (request.tema, prof_id))
-                if request.escala_fonte is not None:
-                    cur.execute("UPDATE preferencia_professor SET escala_fonte = %s WHERE professor_id::text = %s", (request.escala_fonte, prof_id))
-                if request.alto_contraste is not None:
-                    cur.execute("UPDATE preferencia_professor SET alto_contraste = %s WHERE professor_id::text = %s", (request.alto_contraste, prof_id))
-                if request.som_ativo is not None:
-                    cur.execute("UPDATE preferencia_professor SET som_ativo = %s WHERE professor_id::text = %s", (request.som_ativo, prof_id))
-                if request.vibracao_ativa is not None:
-                    cur.execute("UPDATE preferencia_professor SET vibracao_ativa = %s WHERE professor_id::text = %s", (request.vibracao_ativa, prof_id))
-                if request.volume_som is not None:
-                    cur.execute("UPDATE preferencia_professor SET volume_som = %s WHERE professor_id::text = %s", (request.volume_som, prof_id))
-                if request.modo_execucao_padrao:
-                    cur.execute("UPDATE preferencia_professor SET modo_execucao_padrao = %s WHERE professor_id::text = %s", (request.modo_execucao_padrao, prof_id))
-
-                conn.commit()
-                return get_preferencias_professor(prof_id=prof_id)
-    except HTTPException:
-        raise
+                if alteracoes:
+                    atribuicoes = ", ".join(f"{c} = %s" for c in alteracoes)
+                    cur.execute(
+                        f"UPDATE preferencia_professor SET {atribuicoes} WHERE professor_id = %s::uuid",
+                        (*alteracoes.values(), prof_id),
+                    )
+                pref = _ler_preferencias(cur, prof_id)
+            conn.commit()
+            return pref
     except Exception:
-        pref = _IN_MEMORY_PREFERENCIAS.get(prof_id, PreferenciaResponse(professor_id=prof_id).dict())
-        if request.tema: pref["tema"] = request.tema
-        if request.escala_fonte is not None: pref["escala_fonte"] = request.escala_fonte
-        if request.alto_contraste is not None: pref["alto_contraste"] = request.alto_contraste
-        if request.som_ativo is not None: pref["som_ativo"] = request.som_ativo
-        if request.vibracao_ativa is not None: pref["vibracao_ativa"] = request.vibracao_ativa
-        if request.volume_som is not None: pref["volume_som"] = request.volume_som
-        if request.modo_execucao_padrao: pref["modo_execucao_padrao"] = request.modo_execucao_padrao
-        _IN_MEMORY_PREFERENCIAS[prof_id] = pref
-        return PreferenciaResponse(**pref)
+        raise _erro_banco_preferencias()
