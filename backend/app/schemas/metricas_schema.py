@@ -15,6 +15,33 @@ class SessaoHistoricoResponse(BaseModel):
     percentual_acertos: float | None = None
 
 
+class AtividadeTrilhaResponse(BaseModel):
+    atividade_id: str
+    numero: int
+    titulo: str
+    status: str = Field(..., description="CONCLUIDA, INICIADA (só parciais) ou PENDENTE")
+    ultima_nota: float | None = None
+    melhor_nota: float | None = None
+
+
+class ModuloTrilhaResponse(BaseModel):
+    modulo_id: int
+    nome: str
+    categoria: str
+    concluidas: int = 0
+    total: int = 0
+    atividades: list[AtividadeTrilhaResponse] = []
+
+
+class FichaDesempenhoResponse(BaseModel):
+    simbolo: str
+    tipo: str
+    acertos: int = 0
+    erros: int = 0
+    percentual: float | None = Field(default=None, description="% de acerto; null se nunca foi pedida")
+    troca_mais_comum: str | None = Field(default=None, description="Ficha apresentada com mais frequência no lugar dela")
+
+
 class MetricasAlunoResponse(BaseModel):
     aluno_id: str
     aluno_nome: str
@@ -29,6 +56,9 @@ class MetricasAlunoResponse(BaseModel):
     historico: list[SessaoHistoricoResponse] = []
     notas_janela: int = 3
     minimo_notas: int = 2
+    sessoes_semana: int = Field(default=0, description="Sessões encerradas nos últimos 7 dias")
+    progresso_modulos: list[ModuloTrilhaResponse] = []
+    fichas: list[FichaDesempenhoResponse] = []
     alertas: list[AlertaPedagógicoResponse] = []
 
 

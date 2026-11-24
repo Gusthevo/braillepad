@@ -3,6 +3,12 @@ import '../theme/app_theme.dart';
 import '../services/turma_service.dart';
 import '../services/aluno_service.dart';
 import '../services/metricas_service.dart';
+import '../widgets/metricas/alfabeto_tatil.dart';
+import '../widgets/metricas/evolucao_chart.dart';
+import '../widgets/metricas/metricas_cores.dart';
+import '../widgets/metricas/status_gauge.dart';
+import '../widgets/metricas/trilha_modulos.dart';
+import '../widgets/metricas/turma_grid.dart';
 
 class MetricasScreen extends StatefulWidget {
   const MetricasScreen({super.key});
@@ -12,6 +18,8 @@ class MetricasScreen extends StatefulWidget {
 }
 
 class _MetricasScreenState extends State<MetricasScreen> {
+  final _scrollController = ScrollController();
+
   List<Map<String, dynamic>> _turmas = [];
   List<Map<String, dynamic>> _alunos = [];
 
@@ -26,15 +34,21 @@ class _MetricasScreenState extends State<MetricasScreen> {
   bool _erroAluno = false;
   bool _erroTurma = false;
 
-  // Limiares padrão do config_metricas (usados só para colorir as barras).
-  static const double _limiarVerde = 75.0;
-  static const double _limiarAmarelo = 50.0;
-
   @override
   void initState() {
     super.initState();
     _loadInitialData();
   }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Carregamento
+  // ---------------------------------------------------------------------------
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingTurmas = true);
@@ -106,102 +120,28 @@ class _MetricasScreenState extends State<MetricasScreen> {
       return;
     }
     await _onTurmaChanged(turmaId);
-    if (alunoId != null &&
-        alunoId != _selectedAlunoId &&
-        _alunos.any((a) => a['id'] == alunoId)) {
+    if (alunoId != null && alunoId != _selectedAlunoId && _alunos.any((a) => a['id'] == alunoId)) {
       await _loadMetricasAluno(alunoId);
     }
   }
 
-  String _formatarData(String? iso) {
-    final dt = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
-    if (dt == null) return '';
-    String dois(int n) => n.toString().padLeft(2, '0');
-    return '${dois(dt.day)}/${dois(dt.month)}/${dt.year}';
-  }
-
-  Color _corDaNota(double nota) {
-    if (nota >= _limiarVerde) return Colors.green.shade700;
-    if (nota >= _limiarAmarelo) return Colors.amber.shade800;
-    return Colors.red.shade700;
-  }
-
-  Widget _buildErroCard(String mensagem) {
-    return Card(
-      color: Colors.red.shade50,
-      child: ListTile(
-        leading: Icon(Icons.cloud_off_rounded, color: Colors.red.shade700),
-        title: Text(mensagem,
-            style: TextStyle(
-                color: Colors.red.shade900, fontWeight: FontWeight.w600)),
-        subtitle: const Text('Verifique a conexão com o servidor.'),
-        trailing: TextButton(
-            onPressed: _recarregar, child: const Text('Tentar de novo')),
-      ),
-    );
-  }
-
-  Widget _buildStatusColoridoBadge(String statusStr) {
-    Color bg;
-    IconData icon;
-    String label;
-
-    switch (statusStr.toUpperCase()) {
-      case 'VERDE':
-        bg = Colors.green.shade600;
-        icon = Icons.check_circle_rounded;
-        label = '🟢 Verde (Autonomia)';
-        break;
-      case 'AMARELO':
-        bg = Colors.amber.shade800;
-        icon = Icons.warning_amber_rounded;
-        label = '🟡 Amarelo (Em Desenvolv.)';
-        break;
-      case 'VERMELHO':
-        bg = Colors.red.shade600;
-        icon = Icons.error_outline_rounded;
-        label = '🔴 Vermelho (Precisa Apoio)';
-        break;
-      default:
-        bg = Colors.grey.shade600;
-        icon = Icons.help_outline_rounded;
-        label = '⚪ Cinza (Dados Insufic.)';
+  void _selecionarAlunoDaGrade(String alunoId) {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 14),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    if (alunoId != _selectedAlunoId) _loadMetricasAluno(alunoId);
   }
+
+  // ---------------------------------------------------------------------------
+  // Layout
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.warmBackground,
       appBar: AppBar(
-        title: const Text('Métricas e Relatórios (T05)'),
+        title: const Text('Métricas e Relatórios'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -209,465 +149,43 @@ class _MetricasScreenState extends State<MetricasScreen> {
       ),
       body: SafeArea(
         child: _isLoadingTurmas
-            ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.primaryOrange))
+            ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange))
             : RefreshIndicator(
                 color: AppTheme.primaryOrange,
                 onRefresh: _recarregar,
                 child: ListView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   children: [
-                    // Filter Section Card
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Filtros de Relatório:',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Turma Dropdown
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedTurmaId,
-                              decoration: InputDecoration(
-                                labelText: 'Turma',
-                                prefixIcon: const Icon(Icons.groups_outlined,
-                                    color: AppTheme.primaryOrange),
-                                filled: true,
-                                fillColor: AppTheme.warmBackground,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              items: _turmas.map((t) {
-                                return DropdownMenuItem<String>(
-                                  value: t['id'],
-                                  child: Text(t['nome']),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) _onTurmaChanged(val);
-                              },
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            // Aluno Dropdown
-                            DropdownButtonFormField<String?>(
-                              key: ValueKey(
-                                  'alunos_${_selectedTurmaId}_${_alunos.length}'),
-                              initialValue: _selectedAlunoId,
-                              hint: Text(_isLoadingMetricas
-                                  ? 'Carregando alunos...'
-                                  : 'Nenhum aluno nesta turma'),
-                              decoration: InputDecoration(
-                                labelText: 'Aluno',
-                                prefixIcon: const Icon(Icons.person_outline,
-                                    color: AppTheme.primaryOrange),
-                                filled: true,
-                                fillColor: AppTheme.warmBackground,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              items: _alunos.map((a) {
-                                return DropdownMenuItem<String?>(
-                                  value: a['id'],
-                                  child: Text('${a['nome']} ${a['sobrenome']}'),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) _loadMetricasAluno(val);
-                              },
-                            ),
-                          ],
+                    _buildFiltros(),
+                    const SizedBox(height: 16),
+                    if (_erroAluno) _buildErroCard('Não foi possível carregar as métricas do aluno.'),
+                    if (_erroTurma) _buildErroCard('Não foi possível carregar o relatório da turma.'),
+                    if (_isLoadingMetricas && _metricasAluno == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
+                      ),
+                    if (_metricasAluno != null)
+                      AnimatedOpacity(
+                        opacity: _isLoadingMetricas ? 0.4 : 1,
+                        duration: const Duration(milliseconds: 200),
+                        child: _buildPainelAluno(_metricasAluno!),
+                      ),
+                    if (_metricasTurma != null) ...[
+                      const SizedBox(height: 8),
+                      _Secao(
+                        icone: Icons.groups_rounded,
+                        titulo: 'Turma',
+                        subtitulo: 'Toque num aluno para ver o painel dele',
+                        child: TurmaGrid(
+                          turma: _metricasTurma!,
+                          alunoSelecionadoId: _selectedAlunoId,
+                          onSelecionar: _selecionarAlunoDaGrade,
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    _isLoadingMetricas
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                                color: AppTheme.primaryOrange))
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_erroAluno)
-                                _buildErroCard(
-                                    'Não foi possível carregar as métricas do aluno.'),
-                              if (_erroTurma)
-                                _buildErroCard(
-                                    'Não foi possível carregar o relatório da turma.'),
-
-                              // 1. Status Colorido do Aluno (RF-031) - Margem Fixada com Expanded
-                              if (_metricasAluno != null) ...[
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                _metricasAluno!['aluno_nome'] ??
-                                                    'Aluno',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            _buildStatusColoridoBadge(
-                                                _metricasAluno![
-                                                        'status_colorido'] ??
-                                                    'CINZA'),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _metricasAluno!['descricao_status'] ??
-                                              '',
-                                          style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                              fontSize: 13),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: _buildMetricTile(
-                                                'Média das últimas ${_metricasAluno!['notas_janela'] ?? 3} notas',
-                                                _metricasAluno![
-                                                            'media_notas'] !=
-                                                        null
-                                                    ? '${(_metricasAluno!['media_notas'] as num).toStringAsFixed(1)} pts'
-                                                    : '—',
-                                                Icons.analytics_rounded,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: _buildMetricTile(
-                                                'Sessões Concluídas',
-                                                '${_metricasAluno!['total_sessoes_concluidas'] ?? 0}',
-                                                Icons
-                                                    .check_circle_outline_rounded,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                // 2. Histórico das Últimas Atividades / Notas
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Histórico de Notas (mais recente primeiro):',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.darkText),
-                                ),
-                                const SizedBox(height: 8),
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Builder(builder: (context) {
-                                      final historico =
-                                          (_metricasAluno!['historico']
-                                                  as List?) ??
-                                              const [];
-                                      final janela =
-                                          (_metricasAluno!['notas_janela']
-                                                      as num?)
-                                                  ?.toInt() ??
-                                              3;
-                                      if (historico.isEmpty) {
-                                        return const Center(
-                                          child: Padding(
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 12.0),
-                                            child: Text(
-                                              'Nenhuma atividade concluída com nota ainda.',
-                                              style: TextStyle(
-                                                  color: Colors.grey,
-                                                  fontSize: 13),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          ...historico
-                                              .asMap()
-                                              .entries
-                                              .map((entry) {
-                                            final h = entry.value
-                                                as Map<String, dynamic>;
-                                            final nota =
-                                                (h['nota'] as num).toDouble();
-                                            final pct = (h['percentual_acertos']
-                                                    as num?)
-                                                ?.toDouble();
-                                            final cor = _corDaNota(nota);
-                                            final entraNaMedia =
-                                                entry.key < janela;
-                                            final subtitulo = [
-                                              h['modulo_nome'] ?? '',
-                                              _formatarData(
-                                                  h['data'] as String?),
-                                              if (pct != null)
-                                                'acertos ${pct.toStringAsFixed(0)}%',
-                                            ]
-                                                .where((e) =>
-                                                    e.toString().isNotEmpty)
-                                                .join(' · ');
-
-                                            return Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 6.0),
-                                              child: Row(
-                                                children: [
-                                                  CircleAvatar(
-                                                    radius: 14,
-                                                    backgroundColor:
-                                                        cor.withValues(
-                                                            alpha: entraNaMedia
-                                                                ? 0.15
-                                                                : 0.06),
-                                                    child: Icon(
-                                                      entraNaMedia
-                                                          ? Icons.star_rounded
-                                                          : Icons
-                                                              .history_rounded,
-                                                      size: 14,
-                                                      color: cor,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          h['atividade_titulo'] ??
-                                                              'Atividade',
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style:
-                                                              const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                  fontSize: 13),
-                                                        ),
-                                                        Text(
-                                                          subtitulo,
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: TextStyle(
-                                                              fontSize: 11,
-                                                              color: Colors.grey
-                                                                  .shade600),
-                                                        ),
-                                                        const SizedBox(
-                                                            height: 4),
-                                                        ClipRRect(
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(4),
-                                                          child:
-                                                              LinearProgressIndicator(
-                                                            value: (nota /
-                                                                    100.0)
-                                                                .clamp(
-                                                                    0.0, 1.0),
-                                                            backgroundColor:
-                                                                Colors.grey
-                                                                    .shade200,
-                                                            color: cor,
-                                                            minHeight: 6,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Text(
-                                                    '${nota.toStringAsFixed(1)} pts',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14,
-                                                        color: cor),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            '★ = nota considerada no status (últimas $janela atividades concluídas).',
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.grey.shade600),
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                  ),
-                                ),
-
-                                // 3. Alertas Pedagógicos (RF-032)
-                                if ((_metricasAluno!['alertas'] as List?)
-                                        ?.isNotEmpty ==
-                                    true) ...[
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Alertas Pedagógicos:',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.darkText),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ...(_metricasAluno!['alertas'] as List)
-                                      .map((alerta) {
-                                    final isEvolucao =
-                                        alerta['tipo'] == 'EVOLUCAO';
-                                    final isFicha =
-                                        alerta['tipo'] == 'FICHA_DIFICIL';
-                                    return Card(
-                                      color: isEvolucao
-                                          ? Colors.green.shade50
-                                          : Colors.orange.shade50,
-                                      child: ListTile(
-                                        leading: Icon(
-                                          isEvolucao
-                                              ? Icons.trending_up_rounded
-                                              : (isFicha
-                                                  ? Icons.touch_app_rounded
-                                                  : Icons
-                                                      .warning_amber_rounded),
-                                          color: isEvolucao
-                                              ? Colors.green.shade800
-                                              : Colors.orange.shade900,
-                                        ),
-                                        title: Text(
-                                          alerta['titulo'] ?? '',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: isEvolucao
-                                                ? Colors.green.shade900
-                                                : Colors.orange.shade900,
-                                          ),
-                                        ),
-                                        subtitle:
-                                            Text(alerta['mensagem'] ?? ''),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              ],
-
-                              const SizedBox(height: 24),
-
-                              // 3. Relatório Coletivo da Turma (RF-033)
-                              if (_metricasTurma != null) ...[
-                                const Text(
-                                  'Relatório Coletivo da Turma:',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.darkText),
-                                ),
-                                const SizedBox(height: 8),
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _metricasTurma!['turma_nome'] ??
-                                              'Turma',
-                                          style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _metricasTurma!['media_turma'] != null
-                                              ? 'Média da turma: ${(_metricasTurma!['media_turma'] as num).toStringAsFixed(1)} pts · ${_metricasTurma!['total_alunos'] ?? 0} alunos'
-                                              : 'Média da turma: — (ainda sem alunos com status definido) · ${_metricasTurma!['total_alunos'] ?? 0} alunos',
-                                          style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                              fontSize: 13),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: [
-                                            _buildStatusCountChip(
-                                                '🟢 Verdes',
-                                                _metricasTurma![
-                                                        'alunos_verde'] ??
-                                                    0,
-                                                Colors.green.shade700),
-                                            _buildStatusCountChip(
-                                                '🟡 Amarelos',
-                                                _metricasTurma![
-                                                        'alunos_amarelo'] ??
-                                                    0,
-                                                Colors.amber.shade800),
-                                            _buildStatusCountChip(
-                                                '🔴 Vermelhos',
-                                                _metricasTurma![
-                                                        'alunos_vermelho'] ??
-                                                    0,
-                                                Colors.red.shade700),
-                                            _buildStatusCountChip(
-                                                '⚪ Cinzas',
-                                                _metricasTurma![
-                                                        'alunos_cinza'] ??
-                                                    0,
-                                                Colors.grey.shade600),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                    ],
                   ],
                 ),
               ),
@@ -675,42 +193,282 @@ class _MetricasScreenState extends State<MetricasScreen> {
     );
   }
 
-  Widget _buildMetricTile(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.warmBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppTheme.primaryOrange, size: 20),
-          const SizedBox(height: 6),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText)),
-          Text(title,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-        ],
-      ),
+  Widget _buildFiltros() {
+    InputDecoration deco(String rotulo, IconData icone) => InputDecoration(
+          labelText: rotulo,
+          prefixIcon: Icon(icone, color: AppTheme.primaryOrange),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        );
+
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            key: ValueKey('turmas_${_turmas.length}_$_selectedTurmaId'),
+            initialValue: _selectedTurmaId,
+            isExpanded: true,
+            decoration: deco('Turma', Icons.groups_outlined),
+            items: [
+              for (final t in _turmas)
+                DropdownMenuItem<String>(
+                  value: t['id'],
+                  child: Text(t['nome'] ?? '', overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (val) {
+              if (val != null && val != _selectedTurmaId) _onTurmaChanged(val);
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: DropdownButtonFormField<String?>(
+            // Recria o campo quando a turma ou o aluno mudam (initialValue só é lido uma vez).
+            key: ValueKey('alunos_${_selectedTurmaId}_${_alunos.length}_$_selectedAlunoId'),
+            initialValue: _selectedAlunoId,
+            isExpanded: true,
+            hint: Text(_isLoadingMetricas ? 'Carregando...' : 'Sem alunos', overflow: TextOverflow.ellipsis),
+            decoration: deco('Aluno', Icons.person_outline),
+            items: [
+              for (final a in _alunos)
+                DropdownMenuItem<String?>(
+                  value: a['id'],
+                  child: Text('${a['nome']} ${a['sobrenome']}', overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (val) {
+              if (val != null) _loadMetricasAluno(val);
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildStatusCountChip(String label, int count, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+  Widget _buildPainelAluno(Map<String, dynamic> m) {
+    final historico = ((m['historico'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final modulos = ((m['progresso_modulos'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final fichas = ((m['fichas'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final alertas = ((m['alertas'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    final janela = (m['notas_janela'] as num?)?.toInt() ?? 3;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Medidor de status
+        _Secao(
+          icone: Icons.person_rounded,
+          titulo: m['aluno_nome'] ?? 'Aluno',
+          subtitulo: m['turma_nome'],
+          child: StatusGauge(
+            media: (m['media_notas'] as num?)?.toDouble(),
+            status: m['status_colorido'] ?? 'CINZA',
+            descricao: m['descricao_status'] ?? '',
+            notasJanela: janela,
+            totalConcluidas: (m['total_sessoes_concluidas'] as num?)?.toInt() ?? 0,
+            sessoesSemana: (m['sessoes_semana'] as num?)?.toInt() ?? 0,
+          ),
+        ),
+
+        // 2. Alertas pedagógicos logo abaixo do status, para não passarem despercebidos
+        if (alertas.isNotEmpty) ...[
+          for (final a in alertas) _AlertaCard(alerta: a),
+          const SizedBox(height: 4),
+        ],
+
+        // 3. Trilha
+        _Secao(
+          icone: Icons.route_rounded,
+          titulo: 'Trilha de atividades',
+          child: TrilhaModulos(modulos: modulos),
+        ),
+
+        // 4. Alfabeto tátil
+        _Secao(
+          icone: Icons.grid_view_rounded,
+          titulo: 'Alfabeto tátil',
+          subtitulo: 'Acerto por ficha · toque para ver detalhes',
+          child: fichas.any((f) => f['percentual'] != null)
+              ? AlfabetoTatil(fichas: fichas)
+              : Text(
+                  'As fichas aparecem coloridas depois das primeiras leituras no PAD.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+        ),
+
+        // 5. Evolução
+        _Secao(
+          icone: Icons.show_chart_rounded,
+          titulo: 'Evolução das notas',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              EvolucaoChart(historico: historico),
+              if (historico.isNotEmpty) ...[
+                const Divider(height: 24),
+                for (final (i, h) in historico.indexed) _LinhaHistorico(sessao: h, naMedia: i < janela),
+                const SizedBox(height: 4),
+                Text(
+                  '★ = conta na média do status (últimas $janela atividades concluídas).',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErroCard(String mensagem) {
+    return Card(
+      color: Colors.red.shade50,
+      child: ListTile(
+        leading: Icon(Icons.cloud_off_rounded, color: Colors.red.shade700),
+        title: Text(mensagem, style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.w600)),
+        subtitle: const Text('Verifique a conexão com o servidor.'),
+        trailing: TextButton(onPressed: _recarregar, child: const Text('Tentar de novo')),
       ),
-      child: Text(
-        '$label: $count',
-        style:
-            TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+    );
+  }
+}
+
+/// Cartão de seção com ícone e título.
+class _Secao extends StatelessWidget {
+  final IconData icone;
+  final String titulo;
+  final String? subtitulo;
+  final Widget child;
+
+  const _Secao({required this.icone, required this.titulo, this.subtitulo, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryOrange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icone, size: 18, color: AppTheme.primaryOrange),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titulo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                      ),
+                      if (subtitulo != null && subtitulo!.isNotEmpty)
+                        Text(subtitulo!, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlertaCard extends StatelessWidget {
+  final Map<String, dynamic> alerta;
+
+  const _AlertaCard({required this.alerta});
+
+  @override
+  Widget build(BuildContext context) {
+    final tipo = alerta['tipo'] as String? ?? '';
+    final (icone, cor, fundo) = switch (tipo) {
+      'EVOLUCAO' => (Icons.trending_up_rounded, Colors.green.shade800, Colors.green.shade50),
+      'FICHA_DIFICIL' => (Icons.touch_app_rounded, Colors.deepOrange.shade800, Colors.deepOrange.shade50),
+      _ => (Icons.trending_down_rounded, Colors.red.shade800, Colors.red.shade50),
+    };
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: fundo,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ListTile(
+        leading: Icon(icone, color: cor),
+        title: Text(alerta['titulo'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, color: cor, fontSize: 14)),
+        subtitle: Text(alerta['mensagem'] ?? '', style: const TextStyle(fontSize: 12)),
+      ),
+    );
+  }
+}
+
+class _LinhaHistorico extends StatelessWidget {
+  final Map<String, dynamic> sessao;
+  final bool naMedia;
+
+  const _LinhaHistorico({required this.sessao, required this.naMedia});
+
+  @override
+  Widget build(BuildContext context) {
+    final nota = (sessao['nota'] as num).toDouble();
+    final pct = (sessao['percentual_acertos'] as num?)?.toDouble();
+    final cor = MetricasCores.porValor(nota);
+    final subtitulo = [
+      formatarDataCurta(sessao['data'] as String?, comAno: true),
+      if (pct != null) 'acertos ${pct.toStringAsFixed(0)}%',
+    ].where((e) => e.isNotEmpty).join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            child: naMedia ? const Icon(Icons.star_rounded, size: 16, color: AppTheme.amberAccent) : null,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sessao['atividade_titulo'] ?? 'Atividade',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                Text(subtitulo, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: cor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+            child: Text(
+              nota.toStringAsFixed(0),
+              style: TextStyle(fontWeight: FontWeight.bold, color: cor, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

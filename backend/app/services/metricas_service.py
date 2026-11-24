@@ -14,6 +14,9 @@ from ..schemas.metricas_schema import (
     MetricasTurmaResponse,
     AlertaPedagógicoResponse,
     SessaoHistoricoResponse,
+    ModuloTrilhaResponse,
+    AtividadeTrilhaResponse,
+    FichaDesempenhoResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,6 +100,101 @@ def _alertas_fichas_dificeis(cur, aluno_id: str, cfg: _ConfigMetricas) -> list[A
     ]
 
 
+def _progresso_modulos(cur, aluno_id: str) -> list[ModuloTrilhaResponse]:
+    """Trilha: cada atividade de cada módulo com o status e as notas do aluno."""
+    cur.execute(
+        """
+        SELECT m.id, m.nome, m.categoria, at.id::text, at.numero, at.titulo,
+               bool_or(s.status = 'CONCLUIDA') AS concluida,
+               bool_or(s.status = 'PARCIAL') AS parcial,
+               max(av.nota) AS melhor_nota,
+               (array_agg(av.nota ORDER BY s.encerrada_em DESC)
+                    FILTER (WHERE av.nota IS NOT NULL))[1] AS ultima_nota
+        FROM modulo m
+        JOIN atividade at ON at.modulo_id = m.id AND at.ativa
+        LEFT JOIN sessao_atividade s
+               ON s.atividade_id = at.id AND s.aluno_id::text = %s AND s.status <> 'EM_ANDAMENTO'
+        LEFT JOIN avaliacao_sessao av ON av.sessao_id = s.id AND s.status = 'CONCLUIDA'
+        WHERE m.ativo
+        GROUP BY m.id, m.numero, m.nome, m.categoria, at.id, at.numero, at.titulo
+        ORDER BY m.numero, at.numero
+        """,
+        (aluno_id,),
+    )
+    modulos: dict[int, ModuloTrilhaResponse] = {}
+    for m_id, m_nome, cat, at_id, num, titulo, concluida, parcial, melhor, ultima in cur.fetchall():
+        mod = modulos.setdefault(m_id, ModuloTrilhaResponse(modulo_id=m_id, nome=m_nome, categoria=cat))
+        status = "CONCLUIDA" if concluida else ("INICIADA" if parcial else "PENDENTE")
+        mod.atividades.append(
+            AtividadeTrilhaResponse(
+                atividade_id=at_id,
+                numero=num,
+                titulo=(titulo or "").replace("[DEMONSTRACAO]", "").strip(),
+                status=status,
+                melhor_nota=float(melhor) if melhor is not None else None,
+                ultima_nota=float(ultima) if ultima is not None else None,
+            )
+        )
+        mod.total += 1
+        mod.concluidas += 1 if concluida else 0
+    return list(modulos.values())
+
+
+def _desempenho_fichas(cur, aluno_id: str) -> list[FichaDesempenhoResponse]:
+    """Alfabeto tátil: % de acerto por ficha esperada (fases pontuáveis e não-tutorial)."""
+    cur.execute(
+        """
+        WITH leituras AS (
+            SELECT lf.ficha_esperada_id, lf.correta, fa_.simbolo AS apresentada
+            FROM leitura_ficha lf
+            JOIN tentativa t ON t.id = lf.tentativa_id
+            JOIN execucao_alvo ea ON ea.id = t.execucao_alvo_id
+            JOIN fase_alvo fa ON fa.id = ea.fase_alvo_id
+            JOIN fase_atividade f ON f.id = fa.fase_id
+            JOIN sessao_atividade s ON s.id = ea.sessao_id
+            JOIN ficha fa_ ON fa_.id = lf.ficha_apresentada_id
+            WHERE s.aluno_id::text = %s AND f.tipo_fase <> 'EXPLORAR'
+        )
+        SELECT fi.simbolo, fi.tipo,
+               count(l.correta) FILTER (WHERE l.correta),
+               count(l.correta) FILTER (WHERE NOT l.correta),
+               mode() WITHIN GROUP (ORDER BY l.apresentada) FILTER (WHERE NOT l.correta)
+        FROM ficha fi
+        LEFT JOIN leituras l ON l.ficha_esperada_id = fi.id
+        WHERE fi.ativa AND fi.tipo IN ('VOGAL', 'CONSOANTE')
+        GROUP BY fi.simbolo, fi.tipo
+        ORDER BY (fi.tipo = 'VOGAL') DESC, fi.simbolo
+        """,
+        (aluno_id,),
+    )
+    fichas = []
+    for simbolo, tipo, acertos, erros, troca in cur.fetchall():
+        total = acertos + erros
+        fichas.append(
+            FichaDesempenhoResponse(
+                simbolo=simbolo,
+                tipo=tipo,
+                acertos=acertos,
+                erros=erros,
+                percentual=round(100.0 * acertos / total, 1) if total else None,
+                troca_mais_comum=troca,
+            )
+        )
+    return fichas
+
+
+def _sessoes_semana(cur, aluno_id: str) -> int:
+    cur.execute(
+        """
+        SELECT count(*) FROM sessao_atividade
+        WHERE aluno_id::text = %s AND status <> 'EM_ANDAMENTO'
+          AND encerrada_em >= now() - interval '7 days'
+        """,
+        (aluno_id,),
+    )
+    return int(cur.fetchone()[0])
+
+
 def _metricas_aluno(cur, aluno_id: str, aluno_nome: str, turma_nome: str, cfg: _ConfigMetricas) -> MetricasAlunoResponse:
     cur.execute(
         """
@@ -178,6 +276,9 @@ def _metricas_aluno(cur, aluno_id: str, aluno_nome: str, turma_nome: str, cfg: _
         historico=historico,
         notas_janela=cfg.notas_janela,
         minimo_notas=cfg.minimo_notas,
+        sessoes_semana=_sessoes_semana(cur, aluno_id),
+        progresso_modulos=_progresso_modulos(cur, aluno_id),
+        fichas=_desempenho_fichas(cur, aluno_id),
         alertas=alertas,
     )
 

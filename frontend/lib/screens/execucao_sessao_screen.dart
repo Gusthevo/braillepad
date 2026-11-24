@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/sessao_service.dart';
 import '../services/braillepad_ble_service.dart';
 import '../services/tts_service.dart';
+import '../services/feedback_service.dart';
 import 'resumo_sessao_screen.dart';
 
 enum EtapaAtividade { tutorial, fase01Ordenada, conclusaoFase01, fase02Randomizada }
@@ -86,9 +87,32 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
       }
     });
 
+    FeedbackService.instance.carregarPreferencias();
+
     // Anuncia por voz o primeiro alvo a ser apresentado
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) _anunciarAlvoAtual();
+    });
+  }
+
+  // Fila de falas: cada frase espera a anterior terminar, para que o
+  // "Excelente!" não seja cortado pelo anúncio do próximo alvo.
+  Future<void> _filaFala = Future.value();
+
+  void _enfileirarFala(Future<void> Function() falar) {
+    _filaFala = _filaFala.then((_) async {
+      if (mounted) await falar();
+    }).catchError((Object e) {
+      debugPrint('[FALA] $e');
+    });
+  }
+
+  /// Som + vibração imediatos; a fala (se houver) entra na fila logo após o som.
+  void _feedback(TipoFeedback tipo, [String? fala]) {
+    final som = FeedbackService.instance.tocar(tipo);
+    _enfileirarFala(() async {
+      await som;
+      if (fala != null && mounted) await TtsService.instance.falar(fala);
     });
   }
 
@@ -99,11 +123,12 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
         : _alvosAtividade;
     if (_alvoIndex < listaAtual.length) {
       String alvo = listaAtual[_alvoIndex];
-      TtsService.instance.falarComandoAlvo(
-        alvo,
-        posicaoAtual: _letraPosicaoNoAlvo,
-        tamanhoTotal: alvo.length,
-      );
+      final posicao = _letraPosicaoNoAlvo;
+      _enfileirarFala(() => TtsService.instance.falarComandoAlvo(
+            alvo,
+            posicaoAtual: posicao,
+            tamanhoTotal: alvo.length,
+          ));
     }
   }
 
@@ -229,7 +254,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
             duration: const Duration(milliseconds: 800),
           ),
         );
-        TtsService.instance.falar(isCorreta ? "Ficha $fichaLimpa testada com sucesso." : "Ficha $fichaLimpa testada.");
+        _feedback(TipoFeedback.letra, isCorreta ? "Ficha $fichaLimpa testada com sucesso." : "Ficha $fichaLimpa testada.");
         return;
       }
 
@@ -245,7 +270,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
               duration: const Duration(milliseconds: 1000),
             ),
           );
-          TtsService.instance.falar("Excelente! $alvoLimpo completada com sucesso!");
+          _feedback(TipoFeedback.acerto, "Excelente! $alvoLimpo completada com sucesso!");
           _avancarParaProximoAlvoOuFase();
         } else {
           // Letra correta no meio da palavra (ex: 'M' de 'MALA')
@@ -256,7 +281,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
               duration: const Duration(milliseconds: 900),
             ),
           );
-          TtsService.instance.falar("Letra $fichaLimpa reconhecida. Próxima letra: ${alvoLimpo[_letraPosicaoNoAlvo]}");
+          _feedback(TipoFeedback.letra, "Letra $fichaLimpa reconhecida. Próxima letra: ${alvoLimpo[_letraPosicaoNoAlvo]}");
         }
       } else {
         _totalErrosFase++;
@@ -274,7 +299,7 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
             duration: const Duration(milliseconds: 1200),
           ),
         );
-        TtsService.instance.falar("Incorreto. A letra esperada é $letraEsperada");
+        _feedback(TipoFeedback.erro, "Quase! Tente de novo. A letra esperada é $letraEsperada");
 
         if (_tentativasNoAlvoAtual >= 3) {
           _avancarParaProximoAlvoOuFase();
@@ -314,9 +339,12 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
         _badgesPositivas = 0;
         _badgesNegativas = 0;
         _iniciarTimer();
+        _anunciarAlvoAtual();
       } else if (_etapaAtual == EtapaAtividade.fase01Ordenada) {
         _etapaAtual = EtapaAtividade.conclusaoFase01;
+        _feedback(TipoFeedback.faseConcluida, "Parabéns! Você completou a primeira fase!");
       } else if (_etapaAtual == EtapaAtividade.fase02Randomizada) {
+        _feedback(TipoFeedback.faseConcluida, "Parabéns! Você concluiu a atividade!");
         _concluirSessaoFinal();
       }
     });
@@ -326,8 +354,11 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
     setState(() {
       _alvoIndex = 0;
       _tentativasNoAlvoAtual = 0;
+      _letraPosicaoNoAlvo = 0;
+      _letrasJaCompletadas.clear();
       _etapaAtual = EtapaAtividade.fase02Randomizada;
     });
+    _anunciarAlvoAtual();
   }
 
   void _concluirSessaoFinal() async {
@@ -344,6 +375,8 @@ class _ExecucaoSessaoScreenState extends State<ExecucaoSessaoScreen> {
       totalAcertos: _totalAcertosFase,
       totalTentativas: totTentativas,
     );
+
+    await _filaFala.timeout(const Duration(seconds: 6), onTimeout: () {});
 
     if (mounted) {
       Navigator.pushReplacement(
